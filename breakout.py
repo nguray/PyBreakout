@@ -414,13 +414,9 @@ class Ship:
 
 class Game:
     def __init__(self, shipTextures=None):
-        self.tempScore = 0
-        self.deleteBrick = None
         self.frame = Rectf(0,0,WIN_WIDTH,WIN_HEIGHT)
-        self.curLevel = 1
-        self.lifes = 3
         self.shipTextures = shipTextures
-        self.loadLevel(1)
+        self.initLevel()
         self.colors = []
         self.colors.append(0x00)
         self.colors.append(int('0xFF99A4A5',16))
@@ -433,6 +429,13 @@ class Game:
         self.colors.append(int('0xFF3898FC',16))
         self.colors.append(int('0xFFF6C710',16))
         self.colors.append(int('0xFF3CBCF0',16))
+
+    def initLevel(self):
+        self.curLevel = 1
+        self.loadLevel(1)
+        self.lifes = 3
+        self.tempScore = 0
+        self.deleteBrick = None
 
     def loadLevel(self, iLevel: int =0):
         self.tbl = []
@@ -751,6 +754,16 @@ def run():
     if succesSound!=None:
         sdl2.sdlmixer.Mix_VolumeChunk(succesSound,20)
 
+    sound_path = "Arkanoid SFX (10).wav"
+    faillureSound = sdl2.sdlmixer.Mix_LoadWAV(sound_path.encode("utf8"))
+    if faillureSound!=None:
+        sdl2.sdlmixer.Mix_VolumeChunk(faillureSound,20)
+
+    sound_path = "Arkanoid SFX (11).wav"
+    gameOverSound = sdl2.sdlmixer.Mix_LoadWAV(sound_path.encode("utf8"))
+    if gameOverSound!=None:
+        sdl2.sdlmixer.Mix_VolumeChunk(gameOverSound,20)
+
     # create window
     win = sdl2.SDL_CreateWindow(b"Breakout SDL",
             sdl2.SDL_WINDOWPOS_CENTERED,
@@ -948,9 +961,17 @@ def run():
                             game.lifes -= 1
                             listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
                             playerShip.setMediumSize()
+                            if faillureSound != None:
+                                sdl2.sdlmixer.Mix_PlayChannel(-1, faillureSound, 0)
                         else:
                             # Game Over
-                            pass
+                            game.initLevel()
+                            listBalls = []
+                            listBonus = []
+                            listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
+                            playerShip.setMediumSize()
+                            if gameOverSound != None:
+                                sdl2.sdlmixer.Mix_PlayChannel(-1, gameOverSound, 0)
 
                             
             # check ship hit bonus
