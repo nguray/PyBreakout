@@ -45,6 +45,25 @@ class Rectf:
         return (x>=self.x and x<=right and y>=self.y and y<=bottom)
 
 
+class Brick:
+    def __init__(self, x:float, y:float, type:int):
+        self.left = x+1
+        self.top  = y+1
+        self.type = type
+        self.right = x + BRICK_WIDTH - 1
+        self.bottom = y + BRICK_HEIGHT - 1
+        if self.type==1:
+            self.resistance = 4
+        elif self.type==10:
+            self.resistance = 8
+        else:
+            self.resistance = 1
+
+    def contain(self, x, y):
+        return  (x>self.left and x<self.right and 
+                    y>self.top and y<self.bottom)
+
+
 class Ball:
     def __init__(self, x:int =0, y:int =0, r:int = 5):
         self.pos = Vector2f( x, y)
@@ -106,12 +125,202 @@ class Ball:
     def launch(self):
         while True:
             ia = randint(70, 110)
-            if ia!=90:
+            if ia<89 or ia>91:
                 break
         a = -(math.pi*ia)/180.0
         self.setVelocity(Vector2f( 9.5*math.cos(a), 9.5*math.sin(a)))
         self.computeNextPos()
         self.fstandby = False
+
+    def hitBrick(self, br: Brick, offSetX:float, offSetY:float):
+
+        x1 = self.pos.x + offSetX
+        y1 = self.pos.y + offSetY
+        x2 = self.next_pos.x + offSetX
+        y2 = self.next_pos.y + offSetY
+
+        if br.contain(x2,y2):
+            q1 = (x1, y1)
+            q2 = (x2, y2)
+            
+            if br.contain(x1,y1):
+                self.setVelocity(Vector2f(-self.vel.x,-self.vel.y))
+                self.computeNextPos()
+                self.updatePosition()
+                return True
+
+            elif x1<br.left and y1<br.top:
+                # top left corner
+
+                p1 = (br.left, br.top)
+                p2 = (br.right, br.top)
+                ptInter = compute_intersection(p1, p2, q1, q2)
+                if ptInter!=None:
+                    self.setVelocity(Vector2f(self.vel.x,-self.vel.y))
+                    self.next_pos.x = ptInter[0]
+                    self.next_pos.y = ptInter[1]
+                    self.updatePosition()
+                    self.computeNextPos()
+                    return True
+
+                p1 = (br.left, br.top)
+                p2 = (br.left, br.bottom)
+                ptInter = compute_intersection(p1, p2, q1, q2)
+                if ptInter!=None:
+                    self.setVelocity(Vector2f(-self.vel.x,self.vel.y))
+                    self.next_pos.x = ptInter[0]
+                    self.next_pos.y = ptInter[1]
+                    self.updatePosition()
+                    self.computeNextPos()
+                    return True
+
+                self.setVelocity(Vector2f(-self.vel.x,-self.vel.y))
+                self.computeNextPos()
+                self.updatePosition()
+                return True
+
+            elif x1>br.right and y1<br.top:
+                # top right corner
+
+                p1 = (br.left, br.top)
+                p2 = (br.right, br.top)
+                ptInter = compute_intersection(p1, p2, q1, q2)
+                if ptInter!=None:
+                    self.setVelocity(Vector2f(self.vel.x,-self.vel.y))
+                    self.next_pos.x = ptInter[0]
+                    self.next_pos.y = ptInter[1]
+                    self.updatePosition()
+                    self.computeNextPos()
+                    return True
+
+                p1 = (br.right, br.top)
+                p2 = (br.right, br.bottom)
+                ptInter = compute_intersection(p1, p2, q1, q2)
+                if ptInter!=None:
+                    self.setVelocity(Vector2f(-self.vel.x,self.vel.y))
+                    self.next_pos.x = ptInter[0]
+                    self.next_pos.y = ptInter[1]
+                    self.updatePosition()
+                    self.computeNextPos()
+                    return True
+
+                self.setVelocity(Vector2f(-self.vel.x,-self.vel.y))
+                self.computeNextPos()
+                self.updatePosition()
+                return True
+
+            elif x1<br.left and y1>br.bottom:
+                # bottom left corner
+
+                p1 = (br.left, br.bottom)
+                p2 = (br.right, br.bottom)
+                ptInter = compute_intersection(p1, p2, q1, q2)
+                if ptInter!=None:
+                    self.setVelocity(Vector2f(self.vel.x,-self.vel.y))
+                    self.next_pos.x = ptInter[0]
+                    self.next_pos.y = ptInter[1]
+                    self.updatePosition()
+                    self.computeNextPos()
+                    return True
+
+                p1 = (br.left, br.top)
+                p2 = (br.left, br.bottom)
+                ptInter = compute_intersection(p1, p2, q1, q2)
+                if ptInter!=None:
+                    self.setVelocity(Vector2f(-self.vel.x,self.vel.y))
+                    self.next_pos.x = ptInter[0]
+                    self.next_pos.y = ptInter[1]
+                    self.updatePosition()
+                    self.computeNextPos()
+                    return True
+
+                self.setVelocity(Vector2f(-self.vel.x,-self.vel.y))
+                self.computeNextPos()
+                self.updatePosition()
+                return True
+
+            elif x1>br.right and y1>br.bottom:
+                # bottom right corner
+
+                p1 = (br.right, br.top)
+                p2 = (br.right, br.bottom)
+                ptInter = compute_intersection(p1, p2, q1, q2)
+                if ptInter!=None:
+                    self.setVelocity(Vector2f(-self.vel.x,self.vel.y))
+                    self.next_pos.x = ptInter[0]
+                    self.next_pos.y = ptInter[1]
+                    self.updatePosition()
+                    self.computeNextPos()
+                    return True
+
+                p1 = (br.left, br.bottom)
+                p2 = (br.right, br.bottom)
+                ptInter = compute_intersection(p1, p2, q1, q2)
+                if ptInter!=None:
+                    self.setVelocity(Vector2f(self.vel.x,-self.vel.y))
+                    self.next_pos.x = ptInter[0]
+                    self.next_pos.y = ptInter[1]
+                    self.updatePosition()
+                    self.computeNextPos()
+                    return True
+                
+                self.setVelocity(Vector2f(-self.vel.x,-self.vel.y))
+                self.computeNextPos()
+                self.updatePosition()
+                return True
+
+            if y1>br.bottom:
+                # Come from bottom
+
+                p1 = (br.left, br.bottom)
+                p2 = (br.right, br.bottom)
+                ptInter = compute_intersection(p1, p2, q1, q2)
+                if ptInter!=None:
+                    self.setVelocity(Vector2f(self.vel.x,-self.vel.y))
+                    self.next_pos.x = ptInter[0]
+                    self.next_pos.y = ptInter[1]
+                    self.updatePosition()
+                    self.computeNextPos()
+                    return True
+            elif y1<br.top:
+                # Come from top
+                p1 = (br.left, br.top)
+                p2 = (br.right, br.top)
+                ptInter = compute_intersection(p1, p2, q1, q2)
+                if ptInter!=None:
+                    self.setVelocity(Vector2f(self.vel.x,-self.vel.y))
+                    self.next_pos.x = ptInter[0]
+                    self.next_pos.y = ptInter[1]
+                    self.updatePosition()
+                    self.computeNextPos()
+                    return True
+                
+            if x1<br.left:
+                # Come from left
+                p1 = (br.left, br.top)
+                p2 = (br.left, br.bottom)
+                ptInter = compute_intersection(p1, p2, q1, q2)
+                if ptInter!=None:
+                    self.setVelocity(Vector2f(-self.vel.x,self.vel.y))
+                    self.next_pos.x = ptInter[0]
+                    self.next_pos.y = ptInter[1]
+                    self.updatePosition()
+                    self.computeNextPos()
+                    return True
+            elif x1>br.right:
+                # Come from right
+                p1 = (br.right, br.top)
+                p2 = (br.right, br.bottom)
+                ptInter = compute_intersection(p1, p2, q1, q2)
+                if ptInter!=None:
+                    self.setVelocity(Vector2f(-self.vel.x,self.vel.y))
+                    self.next_pos.x = ptInter[0]
+                    self.next_pos.y = ptInter[1]
+                    self.updatePosition()
+                    self.computeNextPos()
+                    return True
+                
+        return False
 
 
 class Bonus:
@@ -203,24 +412,6 @@ class Ship:
         return self.pos.y + self.h
 
 
-class Brick:
-    def __init__(self, x:float, y:float, type:int):
-        self.left = x+1
-        self.top  = y+1
-        self.type = type
-        self.right = x + BRICK_WIDTH - 1
-        self.bottom = y + BRICK_HEIGHT - 1
-        if self.type==1:
-            self.resistance = 4
-        elif self.type==10:
-            self.resistance = 8
-        else:
-            self.resistance = 1
-
-    def contain(self, x, y):
-        return  (x>self.left and x<self.right and 
-                    y>self.top and y<self.bottom)
-
 class Game:
     def __init__(self, shipTextures=None):
         self.tempScore = 0
@@ -301,203 +492,14 @@ class Game:
             return True
         return False
         
-    def checkHitBall(self, br: Brick, b: Ball, offSetX:float, offSetY:float):
 
-        x1 = b.pos.x + offSetX
-        y1 = b.pos.y + offSetY
-        x2 = b.next_pos.x + offSetX
-        y2 = b.next_pos.y + offSetY
-
-        if br.contain(x2,y2):
-            q1 = (x1, y1)
-            q2 = (x2, y2)
-            
-            if br.contain(x1,y1):
-                b.setVelocity(Vector2f(-b.vel.x,-b.vel.y))
-                b.computeNextPos()
-                b.updatePosition()
-                return True
-
-            elif x1<br.left and y1<br.top:
-                # top left corner
-
-                p1 = (br.left, br.top)
-                p2 = (br.right, br.top)
-                ptInter = compute_intersection(p1, p2, q1, q2)
-                if ptInter!=None:
-                    b.setVelocity(Vector2f(b.vel.x,-b.vel.y))
-                    b.next_pos.x = ptInter[0]
-                    b.next_pos.y = ptInter[1]
-                    b.updatePosition()
-                    b.computeNextPos()
-                    return True
-
-                p1 = (br.left, br.top)
-                p2 = (br.left, br.bottom)
-                ptInter = compute_intersection(p1, p2, q1, q2)
-                if ptInter!=None:
-                    b.setVelocity(Vector2f(-b.vel.x,b.vel.y))
-                    b.next_pos.x = ptInter[0]
-                    b.next_pos.y = ptInter[1]
-                    b.updatePosition()
-                    b.computeNextPos()
-                    return True
-
-                b.setVelocity(Vector2f(-b.vel.x,-b.vel.y))
-                b.computeNextPos()
-                b.updatePosition()
-                return True
-
-            elif x1>br.right and y1<br.top:
-                # top right corner
-
-                p1 = (br.left, br.top)
-                p2 = (br.right, br.top)
-                ptInter = compute_intersection(p1, p2, q1, q2)
-                if ptInter!=None:
-                    b.setVelocity(Vector2f(b.vel.x,-b.vel.y))
-                    b.next_pos.x = ptInter[0]
-                    b.next_pos.y = ptInter[1]
-                    b.updatePosition()
-                    b.computeNextPos()
-                    return True
-
-                p1 = (br.right, br.top)
-                p2 = (br.right, br.bottom)
-                ptInter = compute_intersection(p1, p2, q1, q2)
-                if ptInter!=None:
-                    b.setVelocity(Vector2f(-b.vel.x,b.vel.y))
-                    b.next_pos.x = ptInter[0]
-                    b.next_pos.y = ptInter[1]
-                    b.updatePosition()
-                    b.computeNextPos()
-                    return True
-
-                b.setVelocity(Vector2f(-b.vel.x,-b.vel.y))
-                b.computeNextPos()
-                b.updatePosition()
-                return True
-
-            elif x1<br.left and y1>br.bottom:
-                # bottom left corner
-
-                p1 = (br.left, br.bottom)
-                p2 = (br.right, br.bottom)
-                ptInter = compute_intersection(p1, p2, q1, q2)
-                if ptInter!=None:
-                    b.setVelocity(Vector2f(b.vel.x,-b.vel.y))
-                    b.next_pos.x = ptInter[0]
-                    b.next_pos.y = ptInter[1]
-                    b.updatePosition()
-                    b.computeNextPos()
-                    return True
-
-                p1 = (br.left, br.top)
-                p2 = (br.left, br.bottom)
-                ptInter = compute_intersection(p1, p2, q1, q2)
-                if ptInter!=None:
-                    b.setVelocity(Vector2f(-b.vel.x,b.vel.y))
-                    b.next_pos.x = ptInter[0]
-                    b.next_pos.y = ptInter[1]
-                    b.updatePosition()
-                    b.computeNextPos()
-                    return True
-
-                b.setVelocity(Vector2f(-b.vel.x,-b.vel.y))
-                b.computeNextPos()
-                b.updatePosition()
-                return True
-
-            elif x1>br.right and y1>br.bottom:
-                # bottom right corner
-
-                p1 = (br.right, br.top)
-                p2 = (br.right, br.bottom)
-                ptInter = compute_intersection(p1, p2, q1, q2)
-                if ptInter!=None:
-                    b.setVelocity(Vector2f(-b.vel.x,b.vel.y))
-                    b.next_pos.x = ptInter[0]
-                    b.next_pos.y = ptInter[1]
-                    b.updatePosition()
-                    b.computeNextPos()
-                    return True
-
-                p1 = (br.left, br.bottom)
-                p2 = (br.right, br.bottom)
-                ptInter = compute_intersection(p1, p2, q1, q2)
-                if ptInter!=None:
-                    b.setVelocity(Vector2f(b.vel.x,-b.vel.y))
-                    b.next_pos.x = ptInter[0]
-                    b.next_pos.y = ptInter[1]
-                    b.updatePosition()
-                    b.computeNextPos()
-                    return True
-                
-                b.setVelocity(Vector2f(-b.vel.x,-b.vel.y))
-                b.computeNextPos()
-                b.updatePosition()
-                return True
-
-            if y1>br.bottom:
-                # Come from bottom
-
-                p1 = (br.left, br.bottom)
-                p2 = (br.right, br.bottom)
-                ptInter = compute_intersection(p1, p2, q1, q2)
-                if ptInter!=None:
-                    b.setVelocity(Vector2f(b.vel.x,-b.vel.y))
-                    b.next_pos.x = ptInter[0]
-                    b.next_pos.y = ptInter[1]
-                    b.updatePosition()
-                    b.computeNextPos()
-                    return True
-            elif y1<br.top:
-                # Come from top
-                p1 = (br.left, br.top)
-                p2 = (br.right, br.top)
-                ptInter = compute_intersection(p1, p2, q1, q2)
-                if ptInter!=None:
-                    b.setVelocity(Vector2f(b.vel.x,-b.vel.y))
-                    b.next_pos.x = ptInter[0]
-                    b.next_pos.y = ptInter[1]
-                    b.updatePosition()
-                    b.computeNextPos()
-                    return True
-                
-            if x1<br.left:
-                # Come from left
-                p1 = (br.left, br.top)
-                p2 = (br.left, br.bottom)
-                ptInter = compute_intersection(p1, p2, q1, q2)
-                if ptInter!=None:
-                    b.setVelocity(Vector2f(-b.vel.x,b.vel.y))
-                    b.next_pos.x = ptInter[0]
-                    b.next_pos.y = ptInter[1]
-                    b.updatePosition()
-                    b.computeNextPos()
-                    return True
-            elif x1>br.right:
-                # Come from right
-                p1 = (br.right, br.top)
-                p2 = (br.right, br.bottom)
-                ptInter = compute_intersection(p1, p2, q1, q2)
-                if ptInter!=None:
-                    b.setVelocity(Vector2f(-b.vel.x,b.vel.y))
-                    b.next_pos.x = ptInter[0]
-                    b.next_pos.y = ptInter[1]
-                    b.updatePosition()
-                    b.computeNextPos()
-                    return True
-                
-        return False
-
-    def doBrickHit(self, b: Ball):
+    def doBricksHit(self, b: Ball):
         for i,br in enumerate(self.tbl):
             if br!=None:
 
                 offSetX = 0.0
                 offSetY = 0.0
-                if self.checkHitBall(br, b, offSetX, offSetY):
+                if b.hitBrick(br, offSetX, offSetY):
                     if br.resistance==1:
                         self.tbl[i] = None
                         self.deleteBrick = br
@@ -508,7 +510,7 @@ class Game:
 
                 offSetX = b.normal_vel.x * b.r
                 offSetY = b.normal_vel.y * b.r
-                if self.checkHitBall(br, b, offSetX, offSetY):
+                if b.hitBrick(br, offSetX, offSetY):
                     if br.resistance==1:
                         self.tbl[i] = None
                         self.deleteBrick = br
@@ -519,7 +521,7 @@ class Game:
 
                 offSetX = -b.normal_vel.x * b.r
                 offSetY = -b.normal_vel.y * b.r
-                if self.checkHitBall(br, b, offSetX, offSetY):
+                if b.hitBrick(br, offSetX, offSetY):
                     if br.resistance==1:
                         self.tbl[i] = None
                         self.deleteBrick = br
@@ -920,7 +922,7 @@ def run():
                         b.computeNextPos()
 
                     #
-                    if game.doBrickHit(b):
+                    if game.doBricksHit(b):
                         if bounceSound != None:
                             sdl2.sdlmixer.Mix_PlayChannel(-1, bounceSound, 0)
                         if game.updateLevel():
