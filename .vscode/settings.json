@@ -1,0 +1,6 @@
+{
+    "editor.selectionClipboard": false,
+    "python.analysis.completeFunctionParens": true,
+    "python.autoComplete.extraPaths": [],
+    "python.analysis.extraPaths": []
+}
