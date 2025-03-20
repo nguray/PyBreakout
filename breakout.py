@@ -13,9 +13,9 @@ import copy
 import sdl2.sdlmixer
 
 WIN_WIDTH   = 600
-WIN_HEIGHT  = 800
+WIN_HEIGHT  = 720
 BRICK_WIDTH = WIN_WIDTH / 11
-BRICK_HEIGHT= WIN_HEIGHT / 33
+BRICK_HEIGHT= WIN_HEIGHT / 30
 
 
 #pip install -U --break-system-packages  git+https://github.com/py-sdl/py-sdl2.git
@@ -721,11 +721,16 @@ def run():
         err = sdl2.sdlmixer.Mix_GetError().decode("utf8")
         raise RuntimeError("Error initializing the mixer: {0}".format(err))
     
+    sound_path = "02_-_Arkanoid_-_ARC_-_Game_Start.ogg"
+    startSound = sdl2.sdlmixer.Mix_LoadWAV(sound_path.encode("utf8"))
+    if startSound!=None:
+        sdl2.sdlmixer.Mix_VolumeChunk(startSound,25)
+        sdl2.sdlmixer.Mix_PlayChannel(-1, startSound, 0)
 
     sound_path = "Arkanoid SFX (1).wav"
     bounceSound = sdl2.sdlmixer.Mix_LoadWAV(sound_path.encode("utf8"))
     if bounceSound!=None:
-        sdl2.sdlmixer.Mix_VolumeChunk(bounceSound,16)
+        sdl2.sdlmixer.Mix_VolumeChunk(bounceSound,5)
         #sdl2.sdlmixer.Mix_PlayChannel(-1, bounceSound, 0)
 
     sound_path = "Arkanoid SFX (6).wav"
@@ -738,6 +743,11 @@ def run():
     catchSound = sdl2.sdlmixer.Mix_LoadWAV(sound_path.encode("utf8"))
     if catchSound!=None:
         sdl2.sdlmixer.Mix_VolumeChunk(catchSound,20)
+
+    sound_path = "Arkanoid SFX (9).wav"
+    succesSound = sdl2.sdlmixer.Mix_LoadWAV(sound_path.encode("utf8"))
+    if succesSound!=None:
+        sdl2.sdlmixer.Mix_VolumeChunk(succesSound,20)
 
     # create window
     win = sdl2.SDL_CreateWindow(b"Breakout SDL",
@@ -918,7 +928,10 @@ def run():
                             listBonus = []
                             listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
                             playerShip.setMediumSize()
-                        if game.tempScore>900:
+                            if succesSound != None:
+                                sdl2.sdlmixer.Mix_PlayChannel(-1, succesSound, 0)
+
+                        if game.tempScore>800:
                             if bounceSound != None:
                                 sdl2.sdlmixer.Mix_PlayChannel(-1, bonusSound, 0)
                             game.tempScore = 0
@@ -927,7 +940,7 @@ def run():
                                                     game.deleteBrick.bottom-game.deleteBrick.top-10
                                                     ))
                     #
-                    if b.pos.y>playerShip.pos.y:
+                    if b.pos.y>(playerShip.pos.y+3*playerShip.h):
                         listBalls.pop(i)
                         if game.lifes>0:
                             game.lifes -= 1
