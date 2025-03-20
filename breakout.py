@@ -29,8 +29,10 @@ class Vector2f:
     def __radd__(self, other):
         return self + other
 
+
 @dataclass
 class Rectf:
+    """Class for Rectf """
     x: float
     y: float
     w: float
@@ -218,11 +220,13 @@ class Brick:
                     y>self.top and y<self.bottom)
 
 class Game:
-    def __init__(self):
+    def __init__(self, shipTextures=None):
         self.tempScore = 0
         self.deleteBrick = None
         self.frame = Rectf(0,0,WIN_WIDTH,WIN_HEIGHT)
         self.curLevel = 1
+        self.lifes = 3
+        self.shipTextures = shipTextures
         self.loadLevel(1)
         self.colors = []
         self.colors.append(0x00)
@@ -267,13 +271,23 @@ class Game:
         self.loadLevel(self.curLevel)
 
     def draw(self, renderer):
+        # Bricks
         for l in range(0,self.nbRows):
             for c in range(0,self.nbColumns):
                 b = self.tbl[l*self.nbColumns+c]
                 if b!=None:
                     sdl2.sdlgfx.roundedBoxColor(renderer, int(b.left+1), int(b.top+1), 
                                 int(b.right-1), int(b.bottom-1), int(2), self.colors[b.type])
-                    
+        # Remain lifes
+        if self.shipTextures!=None:
+            y = WIN_HEIGHT - 20
+            for i in range(0,self.lifes):
+                src_rect = sdl2.SDL_Rect(x=0, y=0, w=64, h=12)
+                x = i * 40 + 10
+                dest_rect = sdl2.SDL_Rect(x=int(x), y=int(y), w=32, h=8)
+                sdl2.SDL_RenderCopy(renderer,self.shipTextures,src_rect,dest_rect)
+
+
     def updateLevel(self)->bool:
         f = True
         for b in self.tbl:
@@ -722,7 +736,7 @@ def run():
         exit()
 
     #
-    game =Game()
+    game =Game(textureShip)
 
     #
     listBonus = []
@@ -830,9 +844,9 @@ def run():
                     b.updatePosition()
 
             #
-            for b in listBalls:
+            for i,b in enumerate(listBalls):
                 if not b.fstandby:
-                    # Check Bal Ship collision
+                    # Check Ball Ship collision
                     ptIntersection = playerShip.hitBall(b)
                     if ptIntersection!=None:
                         vx = b.vel.x
@@ -880,6 +894,17 @@ def run():
                                                     game.deleteBrick.right-game.deleteBrick.left-20,
                                                     game.deleteBrick.bottom-game.deleteBrick.top-10
                                                     ))
+                    #
+                    if b.pos.y>playerShip.pos.y:
+                        listBalls.pop(i)
+                        if game.lifes>0:
+                            game.lifes -= 1
+                            listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
+                            playerShip.setMediumSize()
+                        else:
+                            # Game Over
+                            pass
+
                             
             # check ship hit bonus
             sLeft = playerShip.left()
@@ -926,6 +951,8 @@ def run():
         #
         for b in listBonus:
             b.draw(renderer)
+
+
 
         #
         # p1 = (10, 10)
