@@ -716,16 +716,29 @@ def run():
     sdl2.SDL_Init(sdl2.SDL_INIT_VIDEO|sdl2.SDL_INIT_TIMER|sdl2.SDL_INIT_AUDIO)
 
     # Initialize a 44.1 kHz 16-bit stereo mixer with a 1024-byte buffer size
-    ret = sdl2.sdlmixer.Mix_OpenAudio(44100, sdl2.AUDIO_S16SYS, 2, 1024)
+    ret = sdl2.sdlmixer.Mix_OpenAudio(44100, sdl2.AUDIO_S16SYS, 2, 2*1024)
     if ret < 0:
         err = sdl2.sdlmixer.Mix_GetError().decode("utf8")
         raise RuntimeError("Error initializing the mixer: {0}".format(err))
+    
 
     sound_path = "Arkanoid SFX (1).wav"
     bounceSound = sdl2.sdlmixer.Mix_LoadWAV(sound_path.encode("utf8"))
     if bounceSound!=None:
-        sdl2.sdlmixer.Mix_VolumeChunk(bounceSound,20)
- 
+        sdl2.sdlmixer.Mix_VolumeChunk(bounceSound,16)
+        #sdl2.sdlmixer.Mix_PlayChannel(-1, bounceSound, 0)
+
+    sound_path = "Arkanoid SFX (6).wav"
+    bonusSound = sdl2.sdlmixer.Mix_LoadWAV(sound_path.encode("utf8"))
+    if bonusSound!=None:
+        sdl2.sdlmixer.Mix_VolumeChunk(bonusSound,16)
+        #sdl2.sdlmixer.Mix_PlayChannel(-1, bonusSound, 0)
+
+    sound_path = "Arkanoid SFX (8).wav"
+    catchSound = sdl2.sdlmixer.Mix_LoadWAV(sound_path.encode("utf8"))
+    if catchSound!=None:
+        sdl2.sdlmixer.Mix_VolumeChunk(catchSound,20)
+
     # create window
     win = sdl2.SDL_CreateWindow(b"Breakout SDL",
             sdl2.SDL_WINDOWPOS_CENTERED,
@@ -906,6 +919,8 @@ def run():
                             listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
                             playerShip.setMediumSize()
                         if game.tempScore>900:
+                            if bounceSound != None:
+                                sdl2.sdlmixer.Mix_PlayChannel(-1, bonusSound, 0)
                             game.tempScore = 0
                             listBonus.append(Bonus(randint(1, 3),game.deleteBrick.left+10,game.deleteBrick.top+5,
                                                     game.deleteBrick.right-game.deleteBrick.left-20,
@@ -934,6 +949,8 @@ def run():
                     bRight = bLeft + b.w
                     if ((bLeft>sLeft and bLeft<sRight) or
                         (bRight>sLeft and bRight<sRight)):
+                        if catchSound != None:
+                            sdl2.sdlmixer.Mix_PlayChannel(-1, catchSound, 0)
                         if b.type==1:
                             while True:
                                 it = randint(0,2)
