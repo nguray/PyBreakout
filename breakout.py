@@ -10,6 +10,8 @@ import math
 from random import randint
 import copy
 
+import sdl2.sdlmixer
+
 WIN_WIDTH   = 600
 WIN_HEIGHT  = 800
 BRICK_WIDTH = WIN_WIDTH / 11
@@ -712,6 +714,17 @@ def run():
 
     # initialize
     sdl2.SDL_Init(sdl2.SDL_INIT_VIDEO|sdl2.SDL_INIT_TIMER|sdl2.SDL_INIT_AUDIO)
+
+    # Initialize a 44.1 kHz 16-bit stereo mixer with a 1024-byte buffer size
+    ret = sdl2.sdlmixer.Mix_OpenAudio(44100, sdl2.AUDIO_S16SYS, 2, 1024)
+    if ret < 0:
+        err = sdl2.sdlmixer.Mix_GetError().decode("utf8")
+        raise RuntimeError("Error initializing the mixer: {0}".format(err))
+
+    sound_path = "Arkanoid SFX (1).wav"
+    bounceSound = sdl2.sdlmixer.Mix_LoadWAV(sound_path.encode("utf8"))
+    if bounceSound!=None:
+        sdl2.sdlmixer.Mix_VolumeChunk(bounceSound,20)
  
     # create window
     win = sdl2.SDL_CreateWindow(b"Breakout SDL",
@@ -849,6 +862,8 @@ def run():
                     # Check Ball Ship collision
                     ptIntersection = playerShip.hitBall(b)
                     if ptIntersection!=None:
+                        if bounceSound != None:
+                            sdl2.sdlmixer.Mix_PlayChannel(-1, bounceSound, 0)
                         vx = b.vel.x
                         vy = -b.vel.y
                         dx = 0
@@ -883,6 +898,8 @@ def run():
 
                     #
                     if game.doBrickHit(b):
+                        if bounceSound != None:
+                            sdl2.sdlmixer.Mix_PlayChannel(-1, bounceSound, 0)
                         if game.updateLevel():
                             listBalls = []
                             listBonus = []
@@ -953,7 +970,6 @@ def run():
             b.draw(renderer)
 
 
-
         #
         # p1 = (10, 10)
         # p2 = (100, 100)
@@ -977,6 +993,7 @@ def run():
     sdl2.SDL_DestroyTexture(textureShip)  # Destroy the texture
     sdl2.SDL_DestroyRenderer(renderer)
     sdl2.SDL_DestroyWindow(win)
+    sdl2.sdlmixer.Mix_CloseAudio()
     sdl2.SDL_Quit()
 
 
