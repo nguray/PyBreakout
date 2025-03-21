@@ -958,6 +958,16 @@ def run():
                             sdl2.sdlmixer.Mix_PlayChannel(-1, bouncingSound, 0)
 
 
+                    # generate bonus
+                    if game.tempScore>800:
+                        if bonusSound != None:
+                            sdl2.sdlmixer.Mix_PlayChannel(-1, bonusSound, 0)
+                        game.tempScore = 0
+                        listBonus.append(Bonus(randint(1, 3),game.deleteBrick.left+10,game.deleteBrick.top+5,
+                                                game.deleteBrick.right-game.deleteBrick.left-20,
+                                                game.deleteBrick.bottom-game.deleteBrick.top-10
+                                                ))
+
                     #
                     if game.doBricksHit(b):
                         if bouncingSound != None:
@@ -970,12 +980,6 @@ def run():
                             if succesSound != None:
                                 sdl2.sdlmixer.Mix_PlayChannel(-1, succesSound, 0)
 
-                        if game.tempScore>800:
-                            game.tempScore = 0
-                            listBonus.append(Bonus(randint(1, 3),game.deleteBrick.left+10,game.deleteBrick.top+5,
-                                                    game.deleteBrick.right-game.deleteBrick.left-20,
-                                                    game.deleteBrick.bottom-game.deleteBrick.top-10
-                                                    ))
                     #
                     if b.pos.y>(playerShip.pos.y+3*playerShip.h):
                         listBalls.pop(i)
