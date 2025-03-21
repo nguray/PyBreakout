@@ -11,6 +11,8 @@ from random import randint
 import copy
 
 import sdl2.sdlmixer
+import sdl2.sdlttf
+from ctypes import c_int, byref
 
 WIN_WIDTH   = 600
 WIN_HEIGHT  = 720
@@ -720,49 +722,60 @@ def run():
     # initialize
     sdl2.SDL_Init(sdl2.SDL_INIT_VIDEO|sdl2.SDL_INIT_TIMER|sdl2.SDL_INIT_AUDIO)
 
+    filepath = os.path.abspath(os.path.dirname(__file__))
+    RESOURCES = sdl2.ext.Resources(filepath, "resources")
+
     # Initialize a 44.1 kHz 16-bit stereo mixer with a 1024-byte buffer size
     ret = sdl2.sdlmixer.Mix_OpenAudio(44100, sdl2.AUDIO_S16SYS, 2, 2*1024)
     if ret < 0:
         err = sdl2.sdlmixer.Mix_GetError().decode("utf8")
         raise RuntimeError("Error initializing the mixer: {0}".format(err))
     
-    sound_path = "02_-_Arkanoid_-_ARC_-_Game_Start.ogg"
+    sound_path = RESOURCES.get_path("02_-_Arkanoid_-_ARC_-_Game_Start.ogg")
     startSound = sdl2.sdlmixer.Mix_LoadWAV(sound_path.encode("utf8"))
     if startSound!=None:
         sdl2.sdlmixer.Mix_VolumeChunk(startSound,25)
         sdl2.sdlmixer.Mix_PlayChannel(-1, startSound, 0)
 
-    sound_path = "Arkanoid SFX (1).wav"
+    sound_path = RESOURCES.get_path("Arkanoid SFX (1).wav")
     bounceSound = sdl2.sdlmixer.Mix_LoadWAV(sound_path.encode("utf8"))
     if bounceSound!=None:
         sdl2.sdlmixer.Mix_VolumeChunk(bounceSound,5)
         #sdl2.sdlmixer.Mix_PlayChannel(-1, bounceSound, 0)
 
-    sound_path = "Arkanoid SFX (6).wav"
+    sound_path = RESOURCES.get_path("Arkanoid SFX (6).wav")
     bonusSound = sdl2.sdlmixer.Mix_LoadWAV(sound_path.encode("utf8"))
     if bonusSound!=None:
         sdl2.sdlmixer.Mix_VolumeChunk(bonusSound,16)
         #sdl2.sdlmixer.Mix_PlayChannel(-1, bonusSound, 0)
 
-    sound_path = "Arkanoid SFX (8).wav"
+    sound_path = RESOURCES.get_path("Arkanoid SFX (8).wav")
     catchSound = sdl2.sdlmixer.Mix_LoadWAV(sound_path.encode("utf8"))
     if catchSound!=None:
         sdl2.sdlmixer.Mix_VolumeChunk(catchSound,20)
 
-    sound_path = "Arkanoid SFX (9).wav"
+    sound_path = RESOURCES.get_path("Arkanoid SFX (9).wav")
     succesSound = sdl2.sdlmixer.Mix_LoadWAV(sound_path.encode("utf8"))
     if succesSound!=None:
         sdl2.sdlmixer.Mix_VolumeChunk(succesSound,20)
 
-    sound_path = "Arkanoid SFX (10).wav"
+    sound_path = RESOURCES.get_path("Arkanoid SFX (10).wav")
     faillureSound = sdl2.sdlmixer.Mix_LoadWAV(sound_path.encode("utf8"))
     if faillureSound!=None:
         sdl2.sdlmixer.Mix_VolumeChunk(faillureSound,20)
 
-    sound_path = "Arkanoid SFX (11).wav"
+    sound_path = RESOURCES.get_path("Arkanoid SFX (11).wav")
     gameOverSound = sdl2.sdlmixer.Mix_LoadWAV(sound_path.encode("utf8"))
     if gameOverSound!=None:
         sdl2.sdlmixer.Mix_VolumeChunk(gameOverSound,20)
+
+    sdl2.sdlttf.TTF_Init()
+
+    font_path = RESOURCES.get_path("sansation.ttf")
+    smallFont = sdl2.sdlttf.TTF_OpenFont(font_path.encode("utf8"), 20)
+    if smallFont==None:
+         err = sdl2.sdlttf.TTF_GetError()
+         raise RuntimeError("Error initializing the ttf: {0}".format(err))
 
     # create window
     win = sdl2.SDL_CreateWindow(b"Breakout SDL",
@@ -773,7 +786,7 @@ def run():
     # create renderer
     renderer = sdl2.SDL_CreateRenderer(win, -1, sdl2.SDL_RENDERER_ACCELERATED | sdl2.SDL_RENDERER_PRESENTVSYNC)
 
-    image_path = "SpaceShip.png"  # Specify the image file path
+    image_path = RESOURCES.get_path("SpaceShip.png")
     surface = sdl2.ext.image.load_image(image_path.encode('utf-8'))
     if not surface:
         print(f"Failed to create texture: {sdl2.SDL_GetError()}")
@@ -1022,6 +1035,19 @@ def run():
         for b in listBonus:
             b.draw(renderer)
 
+        sdl2.sdlttf.TTF_SetFontStyle(smallFont, sdl2.sdlttf.TTF_STYLE_NORMAL|sdl2.sdlttf.TTF_STYLE_ITALIC)
+        text = '00102'
+        text_w, text_h = c_int(0), c_int(0)
+        sdl2.sdlttf.TTF_SizeText(smallFont, text.encode("utf-8"), text_w, text_h)
+        tw = text_w.value
+        th = text_h.value
+        textSurface = sdl2.sdlttf.TTF_RenderText_Solid(smallFont, text.encode("utf-8"), sdl2.SDL_Color(255,255,0,255))
+        textTexture = sdl2.SDL_CreateTextureFromSurface(renderer, textSurface)
+        src_rect = sdl2.SDL_Rect(x=0, y=0, w=tw, h=th)
+        dest_rect = sdl2.SDL_Rect(x=int(100), y=int(10), w=tw, h=th)
+        sdl2.SDL_RenderCopy(renderer,textTexture,src_rect,dest_rect)
+        sdl2.SDL_FreeSurface(textSurface)
+        sdl2.SDL_DestroyTexture(textTexture)
 
         #
         # p1 = (10, 10)
@@ -1047,6 +1073,8 @@ def run():
     sdl2.SDL_DestroyRenderer(renderer)
     sdl2.SDL_DestroyWindow(win)
     sdl2.sdlmixer.Mix_CloseAudio()
+    sdl2.sdlttf.TTF_CloseFont(smallFont)
+    sdl2.sdlttf.TTF_Quit()
     sdl2.SDL_Quit()
 
 
