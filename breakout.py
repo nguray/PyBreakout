@@ -738,10 +738,17 @@ def run():
         sdl2.sdlmixer.Mix_PlayChannel(-1, startSound, 0)
 
     sound_path = RESOURCES.get_path("Arkanoid SFX (1).wav")
-    bounceSound = sdl2.sdlmixer.Mix_LoadWAV(sound_path.encode("utf8"))
-    if bounceSound!=None:
-        sdl2.sdlmixer.Mix_VolumeChunk(bounceSound,5)
+    bouncingSound = sdl2.sdlmixer.Mix_LoadWAV(sound_path.encode("utf8"))
+    if bouncingSound!=None:
+        sdl2.sdlmixer.Mix_VolumeChunk(bouncingSound,5)
         #sdl2.sdlmixer.Mix_PlayChannel(-1, bounceSound, 0)
+
+    sound_path = RESOURCES.get_path("Arkanoid SFX (2).wav")
+    laserSound = sdl2.sdlmixer.Mix_LoadWAV(sound_path.encode("utf8"))
+    if laserSound!=None:
+        sdl2.sdlmixer.Mix_VolumeChunk(laserSound,5)
+        #sdl2.sdlmixer.Mix_PlayChannel(-1, bounceSound, 0)
+
 
     sound_path = RESOURCES.get_path("Arkanoid SFX (6).wav")
     bonusSound = sdl2.sdlmixer.Mix_LoadWAV(sound_path.encode("utf8"))
@@ -913,8 +920,8 @@ def run():
                     # Check Ball Ship collision
                     ptIntersection = playerShip.hitBall(b)
                     if ptIntersection!=None:
-                        if bounceSound != None:
-                            sdl2.sdlmixer.Mix_PlayChannel(-1, bounceSound, 0)
+                        if bouncingSound != None:
+                            sdl2.sdlmixer.Mix_PlayChannel(-1, bouncingSound, 0)
                         vx = b.vel.x
                         vy = -b.vel.y
                         dx = 0
@@ -946,11 +953,15 @@ def run():
                     if not game.doFrameHit(b):
                         b.updatePosition()
                         b.computeNextPos()
+                    else:
+                        if bouncingSound != None:
+                            sdl2.sdlmixer.Mix_PlayChannel(-1, bouncingSound, 0)
+
 
                     #
                     if game.doBricksHit(b):
-                        if bounceSound != None:
-                            sdl2.sdlmixer.Mix_PlayChannel(-1, bounceSound, 0)
+                        if bouncingSound != None:
+                            sdl2.sdlmixer.Mix_PlayChannel(-1, bouncingSound, 0)
                         if game.updateLevel():
                             listBalls = []
                             listBonus = []
@@ -960,8 +971,6 @@ def run():
                                 sdl2.sdlmixer.Mix_PlayChannel(-1, succesSound, 0)
 
                         if game.tempScore>800:
-                            if bounceSound != None:
-                                sdl2.sdlmixer.Mix_PlayChannel(-1, bonusSound, 0)
                             game.tempScore = 0
                             listBonus.append(Bonus(randint(1, 3),game.deleteBrick.left+10,game.deleteBrick.top+5,
                                                     game.deleteBrick.right-game.deleteBrick.left-20,
