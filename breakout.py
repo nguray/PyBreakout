@@ -442,33 +442,40 @@ class Ship:
 
 
 class Game:
-    def __init__(self, shipTextures=None, mediumFont=None):
+    def __init__(self, renderer, shipTextures=None, mediumFont=None):
         self.frame = Rectf(0,0,WIN_WIDTH,WIN_HEIGHT)
-        self.score = 0
+        self.lifes = 3
+        self.renderer = renderer
         self.shipTextures = shipTextures
-        self.mediumFont = mediumFont
         self.initLevel()
-        self.colors = []
-        self.colors.append(0x00)
-        self.colors.append(int('0xFF99A4A5',16))
-        self.colors.append(int('0xFF360AF4',16))
-        self.colors.append(int('0xFF0CF1FA',16))
-        self.colors.append(int('0xFFEF662E',16))
-        self.colors.append(int('0xFFEA0CFA',16))
-        self.colors.append(int('0xFF0CFA1D',16))
-        self.colors.append(int('0xFFFFFFFF',16))
-        self.colors.append(int('0xFF3898FC',16))
-        self.colors.append(int('0xFFF6C710',16))
-        self.colors.append(int('0xFF3CBCF0',16))
+        filepath = os.path.abspath(os.path.dirname(__file__))
+        RESOURCES = sdl2.ext.Resources(filepath, "resources")
+        font_path = RESOURCES.get_path("sansation.ttf")
+        self.mediumFont = sdl2.sdlttf.TTF_OpenFont(font_path.encode("utf8"), 18)
+        if self.mediumFont==None:
+            err = sdl2.sdlttf.TTF_GetError()
+            raise RuntimeError("Error initializing the ttf: {0}".format(err))
+        #
+        self.score = 0
+        self.score_text_w = 0
+        self.score_text_h = 0
+        self.score_text_x = 0
+        self.score_text_y = 0
+        self.scoreTexture = None
+        self.updateScoreTexture()
+
 
     def __del__(self):
         # body of destructor
-        pass
+        if self.mediumFont!=None:
+            sdl2.sdlttf.TTF_CloseFont(self.mediumFont)
+        if self.scoreTexture!=None:
+            sdl2.SDL_DestroyTexture(self.scoreTexture)
+
 
     def initLevel(self):
         self.curLevel = 1
         self.loadLevel(1)
-        self.lifes = 3
         self.tempScore = 0
         self.deleteBrick = None
 
@@ -501,13 +508,26 @@ class Game:
         self.curLevel += 1
         self.loadLevel(self.curLevel)
 
-    def draw(self, renderer):
+    def updateScoreTexture(self):
+        sdl2.sdlttf.TTF_SetFontStyle(self.mediumFont, sdl2.sdlttf.TTF_STYLE_BOLD)
+        text = "SCORE : {:06d}".format(self.score)
+        text_w, text_h = c_int(0), c_int(0)
+        sdl2.sdlttf.TTF_SizeText(self.mediumFont, text.encode("utf-8"), text_w, text_h)
+        self.score_text_w = text_w.value
+        self.score_text_h = text_h.value
+        self.score_text_x = self.frame.right()-self.score_text_w-8
+        self.score_text_y = self.frame.bottom()-self.score_text_h-8
+        textSurface = sdl2.sdlttf.TTF_RenderText_Solid(self.mediumFont, text.encode("utf-8"), sdl2.SDL_Color(255,255,0,255))
+        self.scoreTexture = sdl2.SDL_CreateTextureFromSurface(self.renderer, textSurface)
+        sdl2.SDL_FreeSurface(textSurface)
+
+    def draw(self):
         # Bricks
         for l in range(0,self.nbRows):
             for c in range(0,self.nbColumns):
                 b = self.tbl[l*self.nbColumns+c]
                 if b!=None:
-                    b.draw(renderer)
+                    b.draw(self.renderer)
                     #sdl2.sdlgfx.roundedBoxColor(renderer, int(b.left+1), int(b.top+1), 
                     #            int(b.right-1), int(b.bottom-1), int(2), self.colors[b.type])
         # Remain lifes
@@ -517,24 +537,12 @@ class Game:
                 src_rect = sdl2.SDL_Rect(x=0, y=0, w=64, h=12)
                 x = i * 40 + 10
                 dest_rect = sdl2.SDL_Rect(x=int(x), y=int(y), w=32, h=8)
-                sdl2.SDL_RenderCopy(renderer,self.shipTextures,src_rect,dest_rect)
+                sdl2.SDL_RenderCopy(self.renderer,self.shipTextures,src_rect,dest_rect)
 
-        if self.mediumFont!=None:
-            sdl2.sdlttf.TTF_SetFontStyle(self.mediumFont, sdl2.sdlttf.TTF_STYLE_BOLD)
-            text = "SCORE : {:06d}".format(self.score)
-            text_w, text_h = c_int(0), c_int(0)
-            sdl2.sdlttf.TTF_SizeText(self.mediumFont, text.encode("utf-8"), text_w, text_h)
-            text_w = text_w.value
-            text_h = text_h.value
-            text_x = self.frame.right()-text_w-8
-            text_y = self.frame.bottom()-text_h-8
-            textSurface = sdl2.sdlttf.TTF_RenderText_Solid(self.mediumFont, text.encode("utf-8"), sdl2.SDL_Color(255,255,0,255))
-            textTexture = sdl2.SDL_CreateTextureFromSurface(renderer, textSurface)
-            src_rect = sdl2.SDL_Rect(x=0, y=0, w=text_w, h=text_h)
-            dest_rect = sdl2.SDL_Rect(x=int(text_x), y=int(text_y), w=text_w, h=text_h)
-            sdl2.SDL_RenderCopy(renderer,textTexture,src_rect,dest_rect)
-            sdl2.SDL_FreeSurface(textSurface)
-            sdl2.SDL_DestroyTexture(textTexture)
+        if self.scoreTexture!=None:
+            src_rect = sdl2.SDL_Rect(x=0, y=0, w=self.score_text_w, h=self.score_text_h)
+            dest_rect = sdl2.SDL_Rect(x=int(self.score_text_x), y=int(self.score_text_y), w=self.score_text_w, h=self.score_text_h)
+            sdl2.SDL_RenderCopy(self.renderer,self.scoreTexture,src_rect,dest_rect)
 
     def updateLevel(self)->bool:
         f = True
@@ -560,6 +568,7 @@ class Game:
                         self.deleteBrick = br
                         self.tempScore += randint(50, 150)
                         self.score += br.values[br.type]
+                        self.updateScoreTexture()
                     else:
                         self.tbl[i].resistance -= 1
                     return True
@@ -572,6 +581,7 @@ class Game:
                         self.deleteBrick = br
                         self.tempScore += randint(50, 150)
                         self.score += br.values[br.type]
+                        self.updateScoreTexture()
                     else:
                         self.tbl[i].resistance -= 1
                     return True
@@ -584,6 +594,7 @@ class Game:
                         self.deleteBrick = br
                         self.tempScore += randint(50, 150)
                         self.score += br.values[br.type]
+                        self.updateScoreTexture()
                     else:
                         self.tbl[i].resistance -= 1
                     return True
@@ -831,11 +842,6 @@ def run():
 
     sdl2.sdlttf.TTF_Init()
 
-    font_path = RESOURCES.get_path("sansation.ttf")
-    mediumFont = sdl2.sdlttf.TTF_OpenFont(font_path.encode("utf8"), 18)
-    if mediumFont==None:
-         err = sdl2.sdlttf.TTF_GetError()
-         raise RuntimeError("Error initializing the ttf: {0}".format(err))
 
     # create window
     win = sdl2.SDL_CreateWindow(b"Breakout SDL",
@@ -875,7 +881,7 @@ def run():
     Brick.texture = textureBrick
 
     #
-    game =Game(textureShip, mediumFont)
+    game =Game( renderer, textureShip)
 
     #
     listBonus = []
@@ -1099,7 +1105,7 @@ def run():
         sdl2.SDL_RenderClear(renderer)
 
         #
-        game.draw(renderer)
+        game.draw()
 
         #
         for b in listBalls:
@@ -1126,7 +1132,6 @@ def run():
     sdl2.SDL_DestroyRenderer(renderer)
     sdl2.SDL_DestroyWindow(win)
     sdl2.sdlmixer.Mix_CloseAudio()
-    sdl2.sdlttf.TTF_CloseFont(mediumFont)
     sdl2.sdlttf.TTF_Quit()
     sdl2.SDL_Quit()
 
