@@ -14,9 +14,9 @@ import sdl2.sdlmixer
 import sdl2.sdlttf
 from ctypes import c_int, byref
 
-WIN_WIDTH   = 600
+WIN_WIDTH   = 594
 WIN_HEIGHT  = 720
-BRICK_WIDTH = WIN_WIDTH / 11
+BRICK_WIDTH = WIN_WIDTH / 11 # 56 x 24
 BRICK_HEIGHT= WIN_HEIGHT / 30
 
 
@@ -41,21 +41,38 @@ class Rectf:
     y: float
     w: float
     h: float
+    
     def contains(self,x: float,y: float):
         right = self.x + self.w 
         bottom = self.y + self.h
         return (x>=self.x and x<=right and y>=self.y and y<=bottom)
-
+    
+    def left(self):
+        return self.x
+    
+    def right(self):
+        return self.x + self.w
+    
+    def top(self):
+        return self.y
+    
+    def bottom(self):
+        return self.y + self.h
+    
 
 class Brick:
+
+    values:int = (0,50,60,70,80,90,100,110,120,50,0)
+    texture = None
+
     def __init__(self, x:float, y:float, type:int):
         self.left = x+1
         self.top  = y+1
         self.type = type
         self.right = x + BRICK_WIDTH - 1
         self.bottom = y + BRICK_HEIGHT - 1
-        if self.type==1:
-            self.resistance = 4
+        if self.type==9:
+            self.resistance = 6
         elif self.type==10:
             self.resistance = 8
         else:
@@ -65,6 +82,16 @@ class Brick:
         return  (x>self.left and x<self.right and 
                     y>self.top and y<self.bottom)
 
+    def draw(self, renderer):
+        #
+        if self.texture!=None:
+            src_rect = sdl2.SDL_Rect(x=0, y=self.type*24, w=56, h=24)
+            dest_rect = sdl2.SDL_Rect(x=int(self.left), y=int(self.top),
+                                       w=int(self.right-self.left), h=int(self.bottom-self.top))
+            sdl2.SDL_RenderCopy(renderer,self.texture,src_rect,dest_rect)
+        else:
+            sdl2.sdlgfx.rectangleRGBA(renderer, int(self.left), int(self.top),
+                                       int(self.right), int(self.bottom), 50, 50, 255, 255)
 
 class Ball:
     def __init__(self, x:int =0, y:int =0, r:int = 5):
@@ -415,9 +442,11 @@ class Ship:
 
 
 class Game:
-    def __init__(self, shipTextures=None):
+    def __init__(self, shipTextures=None, mediumFont=None):
         self.frame = Rectf(0,0,WIN_WIDTH,WIN_HEIGHT)
+        self.score = 0
         self.shipTextures = shipTextures
+        self.mediumFont = mediumFont
         self.initLevel()
         self.colors = []
         self.colors.append(0x00)
@@ -431,6 +460,10 @@ class Game:
         self.colors.append(int('0xFF3898FC',16))
         self.colors.append(int('0xFFF6C710',16))
         self.colors.append(int('0xFF3CBCF0',16))
+
+    def __del__(self):
+        # body of destructor
+        pass
 
     def initLevel(self):
         self.curLevel = 1
@@ -474,8 +507,9 @@ class Game:
             for c in range(0,self.nbColumns):
                 b = self.tbl[l*self.nbColumns+c]
                 if b!=None:
-                    sdl2.sdlgfx.roundedBoxColor(renderer, int(b.left+1), int(b.top+1), 
-                                int(b.right-1), int(b.bottom-1), int(2), self.colors[b.type])
+                    b.draw(renderer)
+                    #sdl2.sdlgfx.roundedBoxColor(renderer, int(b.left+1), int(b.top+1), 
+                    #            int(b.right-1), int(b.bottom-1), int(2), self.colors[b.type])
         # Remain lifes
         if self.shipTextures!=None:
             y = WIN_HEIGHT - 20
@@ -485,6 +519,22 @@ class Game:
                 dest_rect = sdl2.SDL_Rect(x=int(x), y=int(y), w=32, h=8)
                 sdl2.SDL_RenderCopy(renderer,self.shipTextures,src_rect,dest_rect)
 
+        if self.mediumFont!=None:
+            sdl2.sdlttf.TTF_SetFontStyle(self.mediumFont, sdl2.sdlttf.TTF_STYLE_BOLD)
+            text = "SCORE : {:06d}".format(self.score)
+            text_w, text_h = c_int(0), c_int(0)
+            sdl2.sdlttf.TTF_SizeText(self.mediumFont, text.encode("utf-8"), text_w, text_h)
+            text_w = text_w.value
+            text_h = text_h.value
+            text_x = self.frame.right()-text_w-8
+            text_y = self.frame.bottom()-text_h-8
+            textSurface = sdl2.sdlttf.TTF_RenderText_Solid(self.mediumFont, text.encode("utf-8"), sdl2.SDL_Color(255,255,0,255))
+            textTexture = sdl2.SDL_CreateTextureFromSurface(renderer, textSurface)
+            src_rect = sdl2.SDL_Rect(x=0, y=0, w=text_w, h=text_h)
+            dest_rect = sdl2.SDL_Rect(x=int(text_x), y=int(text_y), w=text_w, h=text_h)
+            sdl2.SDL_RenderCopy(renderer,textTexture,src_rect,dest_rect)
+            sdl2.SDL_FreeSurface(textSurface)
+            sdl2.SDL_DestroyTexture(textTexture)
 
     def updateLevel(self)->bool:
         f = True
@@ -509,6 +559,7 @@ class Game:
                         self.tbl[i] = None
                         self.deleteBrick = br
                         self.tempScore += randint(50, 150)
+                        self.score += br.values[br.type]
                     else:
                         self.tbl[i].resistance -= 1
                     return True
@@ -520,6 +571,7 @@ class Game:
                         self.tbl[i] = None
                         self.deleteBrick = br
                         self.tempScore += randint(50, 150)
+                        self.score += br.values[br.type]
                     else:
                         self.tbl[i].resistance -= 1
                     return True
@@ -531,6 +583,7 @@ class Game:
                         self.tbl[i] = None
                         self.deleteBrick = br
                         self.tempScore += randint(50, 150)
+                        self.score += br.values[br.type]
                     else:
                         self.tbl[i].resistance -= 1
                     return True
@@ -779,8 +832,8 @@ def run():
     sdl2.sdlttf.TTF_Init()
 
     font_path = RESOURCES.get_path("sansation.ttf")
-    smallFont = sdl2.sdlttf.TTF_OpenFont(font_path.encode("utf8"), 20)
-    if smallFont==None:
+    mediumFont = sdl2.sdlttf.TTF_OpenFont(font_path.encode("utf8"), 18)
+    if mediumFont==None:
          err = sdl2.sdlttf.TTF_GetError()
          raise RuntimeError("Error initializing the ttf: {0}".format(err))
 
@@ -806,8 +859,23 @@ def run():
         print(f"Failed to create texture: {sdl2.SDL_GetError()}")
         exit()
 
+
+    image_path = RESOURCES.get_path("Bricks.png")
+    surface = sdl2.ext.image.load_image(image_path.encode('utf-8'))
+    if not surface:
+        print(f"Failed to create texture: {sdl2.SDL_GetError()}")
+        exit()
+
+    # Create a texture from the surface
+    textureBrick = sdl2.SDL_CreateTextureFromSurface(renderer, surface)
+    sdl2.SDL_FreeSurface(surface)  # Free the surface as it's no longer needed
+    if not textureBrick:
+        print(f"Failed to create texture: {sdl2.SDL_GetError()}")
+        exit()
+    Brick.texture = textureBrick
+
     #
-    game =Game(textureShip)
+    game =Game(textureShip, mediumFont)
 
     #
     listBonus = []
@@ -1048,34 +1116,6 @@ def run():
         for b in listBonus:
             b.draw(renderer)
 
-        sdl2.sdlttf.TTF_SetFontStyle(smallFont, sdl2.sdlttf.TTF_STYLE_NORMAL|sdl2.sdlttf.TTF_STYLE_ITALIC)
-        text = '00102'
-        text_w, text_h = c_int(0), c_int(0)
-        sdl2.sdlttf.TTF_SizeText(smallFont, text.encode("utf-8"), text_w, text_h)
-        tw = text_w.value
-        th = text_h.value
-        textSurface = sdl2.sdlttf.TTF_RenderText_Solid(smallFont, text.encode("utf-8"), sdl2.SDL_Color(255,255,0,255))
-        textTexture = sdl2.SDL_CreateTextureFromSurface(renderer, textSurface)
-        src_rect = sdl2.SDL_Rect(x=0, y=0, w=tw, h=th)
-        dest_rect = sdl2.SDL_Rect(x=int(100), y=int(10), w=tw, h=th)
-        sdl2.SDL_RenderCopy(renderer,textTexture,src_rect,dest_rect)
-        sdl2.SDL_FreeSurface(textSurface)
-        sdl2.SDL_DestroyTexture(textTexture)
-
-        #
-        # p1 = (10, 10)
-        # p2 = (100, 100)
-        # q1 = (10, 30)
-        # q2 = (150, 50)
-        # sdl2.sdlgfx.aalineColor(renderer, p1[0], p1[1], p2[0], p2[1], int('0xFF360AF4',16))
-        # sdl2.sdlgfx.aalineColor(renderer, q1[0], q1[1], q2[0], q2[1], int('0xFF360AF4',16))
-        # intersection = compute_intersection(p1, p2, q1, q2)
-        # if intersection:
-        #     print(f"The segments intersect at: {intersection}")
-        #     sdl2.sdlgfx.filledCircleRGBA(renderer, int(intersection[0]), int(intersection[1]), 3, 200, 200, 255, 255)
-        # else:
-        #     print("The segments do not intersect.")
-
         #
         sdl2.SDL_RenderPresent(renderer)
         sdl2.SDL_Delay(20)
@@ -1086,7 +1126,7 @@ def run():
     sdl2.SDL_DestroyRenderer(renderer)
     sdl2.SDL_DestroyWindow(win)
     sdl2.sdlmixer.Mix_CloseAudio()
-    sdl2.sdlttf.TTF_CloseFont(smallFont)
+    sdl2.sdlttf.TTF_CloseFont(mediumFont)
     sdl2.sdlttf.TTF_Quit()
     sdl2.SDL_Quit()
 
