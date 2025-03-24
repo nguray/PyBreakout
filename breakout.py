@@ -72,7 +72,7 @@ class Brick:
         self.right = x + BRICK_WIDTH - 1
         self.bottom = y + BRICK_HEIGHT - 1
         if self.type==9:
-            self.resistance = 6
+            self.resistance = 4
         elif self.type==10:
             self.resistance = 8
         else:
@@ -151,13 +151,18 @@ class Ball:
     def computeNextPos(self):
         self.next_pos = self.pos + self.vel
 
-    def launch(self):
-        while True:
-            ia = randint(70, 110)
-            if ia<89 or ia>91:
-                break
-        a = -(math.pi*ia)/180.0
-        self.setVelocity(Vector2f( 9.5*math.cos(a), 9.5*math.sin(a)))
+    def launch(self, vx):
+
+        if vx==0.0:
+            while True:
+                ia = randint(80, 100)
+                if ia<89 or ia>91:
+                    break
+            a = -(math.pi*ia)/180.0
+            self.setVelocity(Vector2f( 9.5*math.cos(a), 9.5*math.sin(a)))
+        else:
+            self.setVelocity(Vector2f( vx, 9.0))
+
         self.computeNextPos()
         self.fstandby = False
 
@@ -353,25 +358,46 @@ class Ball:
 
 
 class Bonus:
+
+    texture = None
+
     def __init__(self, type:int, x:int =0, y:int =0, w:int =40, h:int =12):
         self.pos = Vector2f( x, y)
         self.vel = Vector2f( 0, 4.0)
         self.w = w
         self.h = h
         self.type = type
+        self.iAnim = 0
+        self.startTimeAnim = sdl2.timer.SDL_GetTicks()
         self.colors = []
         self.colors.append(0x00)
         self.colors.append(int('0xFFEF662E',16))
         self.colors.append(int('0xFFEA0CFA',16))
         self.colors.append(int('0xFF0CFA1D',16))
+        self.colors.append(int('0xFFEF662E',16))
+        self.colors.append(int('0xFFEA0CFA',16))
+        self.colors.append(int('0xFF0CFA1D',16))
 
     def draw(self, renderer):
-        sdl2.sdlgfx.roundedBoxColor(renderer, int(self.pos.x), int(self.pos.y), 
-                    int(self.pos.x+self.w), int(self.pos.y+self.h), int(8), self.colors[self.type])
+        if self.type<=3:
+            if self.texture!=None:
+                src_rect = sdl2.SDL_Rect(x=(self.type-1)*51, y=(self.iAnim % 3)*20, w=50, h=20)
+                dest_rect = sdl2.SDL_Rect(x=int(self.pos.x), y=int(self.pos.y),
+                                        w=int(50), h=int(20))
+                sdl2.SDL_RenderCopy(renderer,self.texture,src_rect,dest_rect)
+        else:
+            sdl2.sdlgfx.roundedBoxColor(renderer, int(self.pos.x), int(self.pos.y), 
+                        int(self.pos.x+self.w), int(self.pos.y+self.h), int(8), self.colors[self.type])
    
     def updatePosition(self):
         self.pos += self.vel
 
+    def updateAnim(self):
+        nbTicks = sdl2.timer.SDL_GetTicks()
+        if (nbTicks-self.startTimeAnim)>250:
+            self.startTimeAnim = nbTicks
+            self.iAnim += 1
+        
 
 class Ship:
     def __init__(self, x:int =0, y:int =0, texture = None):
@@ -379,6 +405,16 @@ class Ship:
         self.last_pos = copy.copy(self.pos)
         self.setMediumSize()
         self.texture = texture
+        self.startTimeS = sdl2.timer.SDL_GetTicks()
+        self.startXMouse = 0
+        self.hSpeed = 0
+
+    def updateSpeed(self):
+        nbTicks = sdl2.timer.SDL_GetTicks()
+        if (nbTicks-self.startTimeS)>10:
+            self.startTimeS = nbTicks
+            self.hSpeed = self.pos.x - self.startXMouse
+            self.startXMouse = self.pos.x
 
     def setSmallSize(self):
         self.w = 64
@@ -442,12 +478,13 @@ class Ship:
 
 
 class Game:
+    
     def __init__(self, renderer, shipTextures=None, mediumFont=None):
         self.frame = Rectf(0,0,WIN_WIDTH,WIN_HEIGHT)
         self.lifes = 3
         self.renderer = renderer
         self.shipTextures = shipTextures
-        self.initLevel()
+        self.fpause = False
         filepath = os.path.abspath(os.path.dirname(__file__))
         RESOURCES = sdl2.ext.Resources(filepath, "resources")
         font_path = RESOURCES.get_path("sansation.ttf")
@@ -462,7 +499,7 @@ class Game:
         self.score_text_x = 0
         self.score_text_y = 0
         self.scoreTexture = None
-        self.updateScoreTexture()
+        self.init()
 
 
     def __del__(self):
@@ -473,11 +510,15 @@ class Game:
             sdl2.SDL_DestroyTexture(self.scoreTexture)
 
 
-    def initLevel(self):
+    def init(self):
+        self.lifes = 3
         self.curLevel = 1
         self.loadLevel(1)
         self.tempScore = 0
         self.deleteBrick = None
+        self.score = 0
+        self.updateScoreTexture()
+
 
     def loadLevel(self, iLevel: int =0):
         self.tbl = []
@@ -544,17 +585,13 @@ class Game:
             dest_rect = sdl2.SDL_Rect(x=int(self.score_text_x), y=int(self.score_text_y), w=self.score_text_w, h=self.score_text_h)
             sdl2.SDL_RenderCopy(self.renderer,self.scoreTexture,src_rect,dest_rect)
 
-    def updateLevel(self)->bool:
-        f = True
+    def isLevelCompleted(self)->bool:
+        """ Check if current level is completed"""
         for b in self.tbl:
             if b!=None:
-                f = False
-                break
-        if f:
-            self.nextLevel()
-            return True
-        return False
-        
+                return False
+        self.nextLevel()
+        return True
 
     def doBricksHit(self, b: Ball):
         for i,br in enumerate(self.tbl):
@@ -844,7 +881,7 @@ def run():
 
 
     # create window
-    win = sdl2.SDL_CreateWindow(b"Breakout SDL",
+    win = sdl2.SDL_CreateWindow(b"Breakout PySDL",
             sdl2.SDL_WINDOWPOS_CENTERED,
             sdl2.SDL_WINDOWPOS_CENTERED,
             WIN_WIDTH, WIN_HEIGHT, sdl2.SDL_WINDOW_SHOWN)
@@ -880,6 +917,20 @@ def run():
         exit()
     Brick.texture = textureBrick
 
+    image_path = RESOURCES.get_path("Bonus.png")
+    surface = sdl2.ext.image.load_image(image_path.encode('utf-8'))
+    if not surface:
+        print(f"Failed to create texture: {sdl2.SDL_GetError()}")
+        exit()
+
+    # Create a texture from the surface
+    textureBonus = sdl2.SDL_CreateTextureFromSurface(renderer, surface)
+    sdl2.SDL_FreeSurface(surface)  # Free the surface as it's no longer needed
+    if not textureBonus:
+        print(f"Failed to create texture: {sdl2.SDL_GetError()}")
+        exit()
+    Bonus.texture = textureBonus
+
     #
     game =Game( renderer, textureShip)
 
@@ -897,18 +948,12 @@ def run():
 
     startTimeH = sdl2.timer.SDL_GetTicks()
 
-    startTimeV = sdl2.timer.SDL_GetTicks()
-    startXMouse = 0
-    shipHSpeed = 0
-
     startTimeFlash = sdl2.timer.SDL_GetTicks()
     iflash = 0
 
     lastMouseXrel = 0
     lastMouseX = 0
     fmouseMove = False
-
-    fpause = False
 
     # run event loop
     running = True
@@ -928,7 +973,7 @@ def run():
                     elif event.key.keysym.sym == sdl2.SDLK_ESCAPE and event.key.repeat==False:
                         running = False
                     elif event.key.keysym.sym == sdl2.SDLK_p and event.key.repeat==False:
-                        fpause ^= True
+                        game.fpause ^= True
                     elif event.key.keysym.sym == sdl2.SDLK_a and event.key.repeat==False:
                         listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
                 case sdl2.SDL_KEYUP:
@@ -941,7 +986,13 @@ def run():
                     if bstate.left==1:
                         for b in listBalls:
                             if b.fstandby:
-                                b.launch()
+                                if playerShip.hSpeed<-6:
+                                    vx = -2
+                                elif playerShip.hSpeed>6:
+                                    vx = 2
+                                else:
+                                    vx = 0.0
+                                b.launch(float(vx))
                                 break
                 case sdl2.SDL_MOUSEMOTION:
                     motion = event.motion
@@ -952,9 +1003,12 @@ def run():
                     else:
                         fmouseMove = False
 
-        #
+        #--------------------------------------------------------
+        # Update game state
+
+        # Manage ship position
         nbTicks = sdl2.timer.SDL_GetTicks()
-        if (nbTicks-startTimeH)>10:
+        if (nbTicks-startTimeH)>20:
             startTimeH = nbTicks
             if velocityH<0:
                 playerShip.moveLeft(8)
@@ -966,31 +1020,43 @@ def run():
                 playerShip.last_pos.x = playerShip.pos.x
                 playerShip.pos.x = lastMouseX
 
+        playerShip.updateSpeed()
+
+        # Update standby balls positions from ship
         for b in listBalls:
             if b.fstandby:
                 b.next_pos.x = playerShip.pos.x
                 b.next_pos.y = playerShip.pos.y - b.r
                 b.updatePosition()
 
-        nbTicks = sdl2.timer.SDL_GetTicks()
-        if (nbTicks-startTimeV)>10:
-            startTimeV = nbTicks
-            shipHSpeed = playerShip.pos.x - startXMouse
-            startXMouse = playerShip.pos.x
 
         #
-        if not fpause:
+        if not game.fpause:
 
-            #
-            for i,b in enumerate(listBonus):
-                if not game.frame.contains(b.pos.x,b.pos.y):
-                    listBonus.pop(i)
-                else:
-                    b.updatePosition()
-
-            #
+            # Manage balls
             for i,b in enumerate(listBalls):
                 if not b.fstandby:
+                    #
+                    if b.pos.y>(playerShip.pos.y+3*playerShip.h):
+                        listBalls.pop(i) # delete ball
+                        if game.lifes>0:
+                            game.lifes -= 1
+                            listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
+                            playerShip.setMediumSize()
+                            if faillureSound != None:
+                                sdl2.sdlmixer.Mix_PlayChannel(-1, faillureSound, 0)
+                            continue
+                        else:
+                            # Game Over
+                            game.init()
+                            listBalls = []
+                            listBonus = []
+                            listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
+                            playerShip.setMediumSize()
+                            if gameOverSound != None:
+                                sdl2.sdlmixer.Mix_PlayChannel(-1, gameOverSound, 0)
+                            break
+
                     # Check Ball Ship collision
                     ptIntersection = playerShip.hitBall(b)
                     if ptIntersection!=None:
@@ -999,9 +1065,9 @@ def run():
                         vx = b.vel.x
                         vy = -b.vel.y
                         dx = 0
-                        if shipHSpeed<-6:
+                        if playerShip.hSpeed<-6:
                             dx = -2
-                        elif shipHSpeed>6:
+                        elif playerShip.hSpeed>6:
                             dx = 2
                         if dx!=0:
                             n = math.sqrt(vx*vx+vy*vy)
@@ -1031,13 +1097,12 @@ def run():
                         if bouncingSound != None:
                             sdl2.sdlmixer.Mix_PlayChannel(-1, bouncingSound, 0)
 
-
                     # generate bonus
                     if game.tempScore>800:
                         if bonusSound != None:
                             sdl2.sdlmixer.Mix_PlayChannel(-1, bonusSound, 0)
                         game.tempScore = 0
-                        listBonus.append(Bonus(randint(1, 3),game.deleteBrick.left+10,game.deleteBrick.top+5,
+                        listBonus.append(Bonus(randint(1, 4),game.deleteBrick.left+10,game.deleteBrick.top+5,
                                                 game.deleteBrick.right-game.deleteBrick.left-20,
                                                 game.deleteBrick.bottom-game.deleteBrick.top-10
                                                 ))
@@ -1046,7 +1111,7 @@ def run():
                     if game.doBricksHit(b):
                         if bouncingSound != None:
                             sdl2.sdlmixer.Mix_PlayChannel(-1, bouncingSound, 0)
-                        if game.updateLevel():
+                        if game.isLevelCompleted():
                             listBalls = []
                             listBonus = []
                             listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
@@ -1054,32 +1119,21 @@ def run():
                             if succesSound != None:
                                 sdl2.sdlmixer.Mix_PlayChannel(-1, succesSound, 0)
 
-                    #
-                    if b.pos.y>(playerShip.pos.y+3*playerShip.h):
-                        listBalls.pop(i)
-                        if game.lifes>0:
-                            game.lifes -= 1
-                            listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
-                            playerShip.setMediumSize()
-                            if faillureSound != None:
-                                sdl2.sdlmixer.Mix_PlayChannel(-1, faillureSound, 0)
-                        else:
-                            # Game Over
-                            game.initLevel()
-                            listBalls = []
-                            listBonus = []
-                            listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
-                            playerShip.setMediumSize()
-                            if gameOverSound != None:
-                                sdl2.sdlmixer.Mix_PlayChannel(-1, gameOverSound, 0)
 
-                            
-            # check ship hit bonus
+            # Manage Bonus      
             sLeft = playerShip.left()
             sTop = playerShip.top()
             sRight = playerShip.right()
             sBottom = playerShip.bottom()
             for i,b in enumerate(listBonus):
+
+                #
+                if not game.frame.contains(b.pos.x,b.pos.y):
+                    listBonus.pop(i)
+                else:
+                    b.updatePosition()
+
+                # check ship hit bonus
                 if b.pos.y>sTop and b.pos.y<sBottom:
                     bLeft = b.pos.x
                     bRight = bLeft + b.w
@@ -1088,19 +1142,19 @@ def run():
                         if catchSound != None:
                             sdl2.sdlmixer.Mix_PlayChannel(-1, catchSound, 0)
                         if b.type==1:
-                            while True:
-                                it = randint(0,2)
-                                if it!=playerShip.isize:
-                                    break
-                            if it==0:
-                                playerShip.setSmallSize()
-                            elif it==1:
-                                playerShip.setMediumSize()
-                            else:
-                                playerShip.setBigSize()
+                            playerShip.setBigSize()
+                        elif b.type==2:
+                            playerShip.setSmallSize()
+                        else:
+                            playerShip.setMediumSize()
                         listBonus.pop(i)
 
-        #
+            for b in listBonus:
+                b.updateAnim()
+            
+
+        #---------------------------------------
+        # Draw game objects
         sdl2.SDL_SetRenderDrawColor(renderer, 30, 30, 80, sdl2.SDL_ALPHA_OPAQUE)
         sdl2.SDL_RenderClear(renderer)
 
@@ -1129,6 +1183,8 @@ def run():
 
     # clean up
     sdl2.SDL_DestroyTexture(textureShip)  # Destroy the texture
+    sdl2.SDL_DestroyTexture(textureBrick)  # Destroy the texture
+    sdl2.SDL_DestroyTexture(textureBonus)  # Destroy the texture
     sdl2.SDL_DestroyRenderer(renderer)
     sdl2.SDL_DestroyWindow(win)
     sdl2.sdlmixer.Mix_CloseAudio()
