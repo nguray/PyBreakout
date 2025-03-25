@@ -406,42 +406,47 @@ class Ship:
         self.setMediumSize()
         self.texture = texture
         self.startTimeS = sdl2.timer.SDL_GetTicks()
+        self.startTimeAnim = sdl2.timer.SDL_GetTicks()
         self.startXMouse = 0
         self.hSpeed = 0
+        self.iflash = 0
 
-    def updateSpeed(self):
+    def updateState(self):
         nbTicks = sdl2.timer.SDL_GetTicks()
-        if (nbTicks-self.startTimeS)>10:
+        if (nbTicks-self.startTimeS)>20:
             self.startTimeS = nbTicks
             self.hSpeed = self.pos.x - self.startXMouse
             self.startXMouse = self.pos.x
+        if (nbTicks-self.startTimeAnim)>200:
+            self.startTimeAnim = nbTicks
+            self.iflash += 1
 
     def setSmallSize(self):
         self.w = 64
-        self.h = 12
+        self.h = 14
         self.w_2 = self.w/2
         self.isize = 0
 
     def setMediumSize(self):
         self.w = 80
-        self.h = 12
+        self.h = 14
         self.w_2 = self.w/2
         self.isize = 1
 
     def setBigSize(self):
         self.w = 104
-        self.h = 12
+        self.h = 14
         self.w_2 = self.w/2
         self.isize = 2
 
-    def draw(self, renderer, iflash):
+    def draw(self, renderer):
         #
         x1 = self.pos.x - self.w/2
         x2 = self.pos.x + self.w/2
         y1 = self.pos.y
         y2 = y1 + self.h
         if self.texture!=None:
-            src_rect = sdl2.SDL_Rect(x=0, y=(iflash % 2)*12 + 2*self.isize*12, w=self.w, h=self.h)
+            src_rect = sdl2.SDL_Rect(x=0, y=(self.iflash % 2)*self.h + 2*self.isize*self.h, w=self.w, h=self.h)
             dest_rect = sdl2.SDL_Rect(x=int(x1), y=int(y1), w=self.w, h=self.h)
             sdl2.SDL_RenderCopy(renderer,self.texture,src_rect,dest_rect)
         else:
@@ -575,7 +580,7 @@ class Game:
         if self.shipTextures!=None:
             y = WIN_HEIGHT - 20
             for i in range(0,self.lifes):
-                src_rect = sdl2.SDL_Rect(x=0, y=0, w=64, h=12)
+                src_rect = sdl2.SDL_Rect(x=0, y=0, w=64, h=14)
                 x = i * 40 + 10
                 dest_rect = sdl2.SDL_Rect(x=int(x), y=int(y), w=32, h=8)
                 sdl2.SDL_RenderCopy(self.renderer,self.shipTextures,src_rect,dest_rect)
@@ -948,12 +953,8 @@ def run():
 
     startTimeH = sdl2.timer.SDL_GetTicks()
 
-    startTimeFlash = sdl2.timer.SDL_GetTicks()
-    iflash = 0
-
     lastMouseXrel = 0
     lastMouseX = 0
-    fmouseMove = False
 
     # run event loop
     running = True
@@ -1012,15 +1013,13 @@ def run():
             startTimeH = nbTicks
             if velocityH<0:
                 playerShip.moveLeft(8)
-                fmouseMove = False
             elif velocityH>0:
                 playerShip.moveRight(8)
-                fmouseMove = False
-            if fmouseMove:
+            else:
                 playerShip.last_pos.x = playerShip.pos.x
                 playerShip.pos.x = lastMouseX
 
-        playerShip.updateSpeed()
+        playerShip.updateState()
 
         # Update standby balls positions from ship
         for b in listBalls:
@@ -1166,11 +1165,7 @@ def run():
             b.draw(renderer)
 
         #
-        nbTicks = sdl2.timer.SDL_GetTicks()
-        if (nbTicks-startTimeFlash)>200:
-            startTimeFlash = nbTicks
-            iflash += 1
-        playerShip.draw(renderer,iflash)
+        playerShip.draw(renderer)
 
         #
         for b in listBonus:
