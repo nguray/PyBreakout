@@ -100,6 +100,7 @@ class Ball:
         self.fstandby = True
         self.r = r
         self.setVelocity(Vector2f( 0, 0))
+        self.fdelete = False
         self.trail = []
         self.trail.append(Vector2f(self.pos.x,self.pos.y))
         self.trail.append(None)
@@ -369,6 +370,7 @@ class Bonus:
         self.type = type
         self.iAnim = 0
         self.startTimeAnim = sdl2.timer.SDL_GetTicks()
+        self.fdelete = False
         self.colors = []
         self.colors.append(0x00)
         self.colors.append(int('0xFFEF662E',16))
@@ -1005,9 +1007,9 @@ def run():
                         fmouseMove = False
 
         #--------------------------------------------------------
-        # Update game state
+        # Update objects states
 
-        # Manage ship position
+        # Update ship position
         nbTicks = sdl2.timer.SDL_GetTicks()
         if (nbTicks-startTimeH)>20:
             startTimeH = nbTicks
@@ -1033,28 +1035,12 @@ def run():
         if not game.fpause:
 
             # Manage balls
-            for i,b in enumerate(listBalls):
+            for b in listBalls:
                 if not b.fstandby:
                     #
                     if b.pos.y>(playerShip.pos.y+3*playerShip.h):
-                        listBalls.pop(i) # delete ball
-                        if game.lifes>0:
-                            game.lifes -= 1
-                            listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
-                            playerShip.setMediumSize()
-                            if faillureSound != None:
-                                sdl2.sdlmixer.Mix_PlayChannel(-1, faillureSound, 0)
-                            continue
-                        else:
-                            # Game Over
-                            game.init()
-                            listBalls = []
-                            listBonus = []
-                            listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
-                            playerShip.setMediumSize()
-                            if gameOverSound != None:
-                                sdl2.sdlmixer.Mix_PlayChannel(-1, gameOverSound, 0)
-                            break
+                        b.fdelete = True # delete ball
+                        continue
 
                     # Check Ball Ship collision
                     ptIntersection = playerShip.hitBall(b)
@@ -1118,17 +1104,37 @@ def run():
                             if succesSound != None:
                                 sdl2.sdlmixer.Mix_PlayChannel(-1, succesSound, 0)
 
+            listBalls[:] = [b for b in listBalls if b.fdelete==False]
+
+            # Check for Game Over
+            if len(listBalls)==0:
+                if game.lifes>0:
+                    game.lifes -= 1
+                    listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
+                    playerShip.setMediumSize()
+                    if faillureSound != None:
+                        sdl2.sdlmixer.Mix_PlayChannel(-1, faillureSound, 0)
+                else:
+                    # Game Over
+                    game.init()
+                    listBalls = []
+                    listBonus = []
+                    listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
+                    playerShip.setMediumSize()
+                    if gameOverSound != None:
+                        sdl2.sdlmixer.Mix_PlayChannel(-1, gameOverSound, 0)
 
             # Manage Bonus      
             sLeft = playerShip.left()
             sTop = playerShip.top()
             sRight = playerShip.right()
             sBottom = playerShip.bottom()
-            for i,b in enumerate(listBonus):
+            for b in listBonus:
 
                 #
                 if not game.frame.contains(b.pos.x,b.pos.y):
-                    listBonus.pop(i)
+                    b.fdelete = True
+                    continue
                 else:
                     b.updatePosition()
 
@@ -1146,12 +1152,13 @@ def run():
                             playerShip.setSmallSize()
                         else:
                             playerShip.setMediumSize()
-                        listBonus.pop(i)
+                        b.fdelete = True
+                else:
+                    b.updateAnim()
 
-            for b in listBonus:
-                b.updateAnim()
+            listBonus[:] = [b for b in listBonus if b.fdelete==False]
+
             
-
         #---------------------------------------
         # Draw game objects
         sdl2.SDL_SetRenderDrawColor(renderer, 30, 30, 80, sdl2.SDL_ALPHA_OPAQUE)
