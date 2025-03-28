@@ -97,7 +97,6 @@ class Ball:
     def __init__(self, x:int =0, y:int =0, r:int = 5):
         self.pos = Vector2f( x, y)
         self.next_pos = copy.copy(self.pos)
-        self.fstandby = True
         self.r = r
         self.setVelocity(Vector2f( 0, 0))
         self.fdelete = False
@@ -825,6 +824,24 @@ def test_intersect():
         print("The segments do not intersect.")
 
 
+def processGameOver(game: Game):
+    events = sdl2.ext.get_events()
+    for event in events:
+        match event.type :
+            case sdl2.SDL_QUIT:
+                game.running = False
+                return False
+            case sdl2.SDL_KEYDOWN:
+                if event.key.keysym.sym == sdl2.SDLK_ESCAPE and event.key.repeat==False:
+                    game.running = False
+                    return False
+            case sdl2.SDL_MOUSEBUTTONDOWN:
+                bstate = sdl2.ext.mouse.mouse_button_state()
+                if bstate.left==1:
+                    return False
+    return True
+
+
 def run():
 
     # initialize
@@ -886,6 +903,11 @@ def run():
 
     sdl2.sdlttf.TTF_Init()
 
+    font_path = RESOURCES.get_path("sansation.ttf")
+    bigFont = sdl2.sdlttf.TTF_OpenFont(font_path.encode("utf8"), 24)
+    if bigFont==None:
+        err = sdl2.sdlttf.TTF_GetError()
+        raise RuntimeError("Error Loading font: {0}".format(err))
 
     # create window
     win = sdl2.SDL_CreateWindow(b"Breakout PySDL",
@@ -959,26 +981,37 @@ def run():
     lastMouseX = 0
 
     # run event loop
-    running = True
+    game.running = True
 
-    while running:
+    while game.running:
 
         events = sdl2.ext.get_events()
         for event in events:
             match event.type :
                 case sdl2.SDL_QUIT:
-                    running = False
+                    game.running = False
                 case sdl2.SDL_KEYDOWN:
                     if event.key.keysym.sym == sdl2.SDLK_LEFT and event.key.repeat==False:
                         velocityH = -1
                     elif event.key.keysym.sym == sdl2.SDLK_RIGHT and event.key.repeat==False:
                         velocityH = 1
                     elif event.key.keysym.sym == sdl2.SDLK_ESCAPE and event.key.repeat==False:
-                        running = False
+                        game.running = False
                     elif event.key.keysym.sym == sdl2.SDLK_p and event.key.repeat==False:
                         game.fpause ^= True
                     elif event.key.keysym.sym == sdl2.SDLK_a and event.key.repeat==False:
                         listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
+                    elif event.key.keysym.sym == sdl2.SDLK_SPACE and event.key.repeat==False:
+                        for b in listBalls:
+                            if b.vel.y==0.0:
+                                if playerShip.hSpeed<-6:
+                                    vx = -2
+                                elif playerShip.hSpeed>6:
+                                    vx = 2
+                                else:
+                                    vx = 0.0
+                                b.launch(float(vx))
+                                break
                 case sdl2.SDL_KEYUP:
                     if event.key.keysym.sym == sdl2.SDLK_LEFT and event.key.repeat==False:
                         velocityH = 0
@@ -988,7 +1021,7 @@ def run():
                     bstate = sdl2.ext.mouse.mouse_button_state()
                     if bstate.left==1:
                         for b in listBalls:
-                            if b.fstandby:
+                            if b.vel.y==0.0:
                                 if playerShip.hSpeed<-6:
                                     vx = -2
                                 elif playerShip.hSpeed>6:
@@ -1000,43 +1033,39 @@ def run():
                 case sdl2.SDL_MOUSEMOTION:
                     motion = event.motion
                     lastMouseX = motion.x
-                    if lastMouseXrel != motion.xrel:
-                        lastMouseXrel = motion.xrel
-                        fmouseMove = True
-                    else:
-                        fmouseMove = False
 
         #--------------------------------------------------------
         # Update objects states
 
         # Update ship position
-        nbTicks = sdl2.timer.SDL_GetTicks()
-        if (nbTicks-startTimeH)>20:
-            startTimeH = nbTicks
-            if velocityH<0:
-                playerShip.moveLeft(8)
-            elif velocityH>0:
-                playerShip.moveRight(8)
-            else:
-                playerShip.last_pos.x = playerShip.pos.x
-                playerShip.pos.x = lastMouseX
+        if velocityH<0:
+            playerShip.moveLeft(10)
+            lastMouseX = playerShip.pos.x
+        elif velocityH>0:
+            playerShip.moveRight(10)
+            lastMouseX = playerShip.pos.x
+        else:
+            dx = int(math.fabs(playerShip.pos.x-lastMouseX))
+            if dx>10:
+                if playerShip.pos.x<lastMouseX:
+                    playerShip.moveRight(10)
+                elif playerShip.pos.x>lastMouseX:
+                    playerShip.moveLeft(10)
+
 
         playerShip.updateState()
-
-        # Update standby balls positions from ship
-        for b in listBalls:
-            if b.fstandby:
-                b.next_pos.x = playerShip.pos.x
-                b.next_pos.y = playerShip.pos.y - b.r
-                b.updatePosition()
-
 
         #
         if not game.fpause:
 
             # Manage balls
             for b in listBalls:
-                if not b.fstandby:
+                if b.vel.y==0:
+                    # Update standby balls positions from ship
+                    b.next_pos.x = playerShip.pos.x
+                    b.next_pos.y = playerShip.pos.y - b.r
+                    b.updatePosition()
+                else:
                     #
                     if b.pos.y>(playerShip.pos.y+3*playerShip.h):
                         b.fdelete = True # delete ball
@@ -1180,7 +1209,7 @@ def run():
 
         #
         sdl2.SDL_RenderPresent(renderer)
-        sdl2.SDL_Delay(20)
+        sdl2.SDL_Delay(25)
 
 
     # clean up
@@ -1190,6 +1219,8 @@ def run():
     sdl2.SDL_DestroyRenderer(renderer)
     sdl2.SDL_DestroyWindow(win)
     sdl2.sdlmixer.Mix_CloseAudio()
+    if bigFont!=None:
+        sdl2.sdlttf.TTF_CloseFont(bigFont)
     sdl2.sdlttf.TTF_Quit()
     sdl2.SDL_Quit()
 
