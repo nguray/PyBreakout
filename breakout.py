@@ -13,6 +13,8 @@ import copy
 import sdl2.sdlmixer
 import sdl2.sdlttf
 from ctypes import c_int, byref
+from enum import Enum
+
 
 WIN_WIDTH   = 594
 WIN_HEIGHT  = 720
@@ -21,6 +23,12 @@ BRICK_HEIGHT= WIN_HEIGHT / 30
 
 
 #pip install -U --break-system-packages  git+https://github.com/py-sdl/py-sdl2.git
+
+class GameMode(Enum):
+    STAND_BY = 1
+    PLAY = 2
+    GAME_OVER = 3
+
 
 @dataclass
 class Vector2f:
@@ -143,8 +151,7 @@ class Ball:
         # sdl2.sdlgfx.aalineColor(renderer, int(x1), int(y1), int(x2), int(y2), int('0xFF360AF4',16))
 
     def updatePosition(self):
-        self.pos.x = self.next_pos.x
-        self.pos.y = self.next_pos.y
+        self.pos = copy.copy(self.next_pos)
         self.trail.insert(0,Vector2f(self.pos.x,self.pos.y))
         self.trail.pop(4)
 
@@ -161,7 +168,7 @@ class Ball:
             a = -(math.pi*ia)/180.0
             self.setVelocity(Vector2f( 9.5*math.cos(a), 9.5*math.sin(a)))
         else:
-            self.setVelocity(Vector2f( vx, 9.0))
+            self.setVelocity(Vector2f( vx, -9.5))
 
         self.computeNextPos()
         self.fstandby = False
@@ -380,7 +387,7 @@ class Bonus:
         self.colors.append(int('0xFF0CFA1D',16))
 
     def draw(self, renderer):
-        if self.type<=3:
+        if self.type<=4:
             if self.texture!=None:
                 src_rect = sdl2.SDL_Rect(x=(self.type-1)*51, y=(self.iAnim % 3)*20, w=50, h=20)
                 dest_rect = sdl2.SDL_Rect(x=int(self.pos.x), y=int(self.pos.y),
@@ -411,6 +418,7 @@ class Ship:
         self.startXMouse = 0
         self.hSpeed = 0
         self.iflash = 0
+        self.fmagnet = False
 
     def updateState(self):
         nbTicks = sdl2.timer.SDL_GetTicks()
@@ -427,18 +435,25 @@ class Ship:
         self.h = 14
         self.w_2 = self.w/2
         self.isize = 0
+        self.fmagnet = False
 
     def setMediumSize(self):
         self.w = 80
         self.h = 14
         self.w_2 = self.w/2
         self.isize = 1
+        self.fmagnet = False
 
     def setBigSize(self):
         self.w = 104
         self.h = 14
         self.w_2 = self.w/2
         self.isize = 2
+        self.fmagnet = False
+
+    def setMagnet(self,f=True):
+        self.setMediumSize()
+        self.fmagnet = f
 
     def draw(self, renderer):
         #
@@ -506,6 +521,22 @@ class Game:
         self.score_text_y = 0
         self.scoreTexture = None
         self.init()
+
+        self.velocityH = 0
+        self.lastMouseX = WIN_WIDTH/2
+
+        self.processEvent = self.processStandby
+
+        #
+        self.listBonus = []
+
+        #
+        self.listBalls = []
+        self.listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
+        
+        self.playerShip = Ship(WIN_WIDTH/2, WIN_HEIGHT-64, shipTextures)
+
+        self.mode = GameMode.STAND_BY
 
 
     def __del__(self):
@@ -613,6 +644,8 @@ class Game:
                         self.score += br.values[br.type]
                         self.updateScoreTexture()
                     else:
+                        self.score += 50
+                        self.updateScoreTexture()
                         self.tbl[i].resistance -= 1
                     return True
 
@@ -626,6 +659,8 @@ class Game:
                         self.score += br.values[br.type]
                         self.updateScoreTexture()
                     else:
+                        self.score += 50
+                        self.updateScoreTexture()
                         self.tbl[i].resistance -= 1
                     return True
 
@@ -639,6 +674,8 @@ class Game:
                         self.score += br.values[br.type]
                         self.updateScoreTexture()
                     else:
+                        self.score += 50
+                        self.updateScoreTexture()
                         self.tbl[i].resistance -= 1
                     return True
 
@@ -725,6 +762,91 @@ class Game:
 
         return  False
     
+    def processStandby(self):
+        events = sdl2.ext.get_events()
+        for event in events:
+            match event.type :
+                case sdl2.SDL_QUIT:
+                    self.running = False
+                    return False
+                case sdl2.SDL_KEYDOWN:
+                    if event.key.keysym.sym == sdl2.SDLK_ESCAPE and event.key.repeat==False:
+                        self.running = False
+                        return False
+                case sdl2.SDL_MOUSEBUTTONDOWN:
+                    bstate = sdl2.ext.mouse.mouse_button_state()
+                    if bstate.left==1:
+                        self.processEvent = self.processPlay
+                        self.mode = GameMode.PLAY
+                        return False
+        return True
+
+
+    def processGameOver(self):
+        events = sdl2.ext.get_events()
+        for event in events:
+            match event.type :
+                case sdl2.SDL_QUIT:
+                    self.running = False
+                    return False
+                case sdl2.SDL_KEYDOWN:
+                    if event.key.keysym.sym == sdl2.SDLK_ESCAPE and event.key.repeat==False:
+                        self.running = False
+                        return False
+                case sdl2.SDL_MOUSEBUTTONDOWN:
+                    bstate = sdl2.ext.mouse.mouse_button_state()
+                    if bstate.left==1:
+                        self.processEvent = self.processStandby
+                        self.mode = GameMode.STAND_BY
+                        return False
+        return True
+
+    def processPlay(self):
+
+        #
+        def launchBall():
+            for b in self.listBalls:
+                if b.vel.y==0.0:
+                    if self.playerShip.hSpeed<-6:
+                        vx = -2
+                    elif self.playerShip.hSpeed>6:
+                        vx = 2
+                    else:
+                        vx = 0.0
+                    b.launch(float(vx))
+                    break
+
+        events = sdl2.ext.get_events()
+        for event in events:
+            match event.type :
+                case sdl2.SDL_QUIT:
+                    self.running = False
+                case sdl2.SDL_KEYDOWN:
+                    if event.key.keysym.sym == sdl2.SDLK_LEFT and event.key.repeat==False:
+                        self.velocityH = -1
+                    elif event.key.keysym.sym == sdl2.SDLK_RIGHT and event.key.repeat==False:
+                        self.velocityH = 1
+                    elif event.key.keysym.sym == sdl2.SDLK_ESCAPE and event.key.repeat==False:
+                        self.running = False
+                    elif event.key.keysym.sym == sdl2.SDLK_p and event.key.repeat==False:
+                        self.fpause ^= True
+                    #elif event.key.keysym.sym == sdl2.SDLK_a and event.key.repeat==False:
+                    #    listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
+                    elif event.key.keysym.sym == sdl2.SDLK_SPACE and event.key.repeat==False:
+                        launchBall()
+                case sdl2.SDL_KEYUP:
+                    if event.key.keysym.sym == sdl2.SDLK_LEFT and event.key.repeat==False:
+                        self.velocityH = 0
+                    elif event.key.keysym.sym == sdl2.SDLK_RIGHT and event.key.repeat==False:
+                        self.velocityH = 0
+                case sdl2.SDL_MOUSEBUTTONDOWN:
+                    bstate = sdl2.ext.mouse.mouse_button_state()
+                    if bstate.left==1:
+                        launchBall()
+                case sdl2.SDL_MOUSEMOTION:
+                    motion = event.motion
+                    self.lastMouseX = motion.x
+
 
 def loadTexture(filePath, renderer):
     # loads bmp image
@@ -824,25 +946,8 @@ def test_intersect():
         print("The segments do not intersect.")
 
 
-def processGameOver(game: Game):
-    events = sdl2.ext.get_events()
-    for event in events:
-        match event.type :
-            case sdl2.SDL_QUIT:
-                game.running = False
-                return False
-            case sdl2.SDL_KEYDOWN:
-                if event.key.keysym.sym == sdl2.SDLK_ESCAPE and event.key.repeat==False:
-                    game.running = False
-                    return False
-            case sdl2.SDL_MOUSEBUTTONDOWN:
-                bstate = sdl2.ext.mouse.mouse_button_state()
-                if bstate.left==1:
-                    return False
-    return True
-
-
 def run():
+
 
     # initialize
     sdl2.SDL_Init(sdl2.SDL_INIT_VIDEO|sdl2.SDL_INIT_TIMER|sdl2.SDL_INIT_AUDIO)
@@ -904,7 +1009,7 @@ def run():
     sdl2.sdlttf.TTF_Init()
 
     font_path = RESOURCES.get_path("sansation.ttf")
-    bigFont = sdl2.sdlttf.TTF_OpenFont(font_path.encode("utf8"), 24)
+    bigFont = sdl2.sdlttf.TTF_OpenFont(font_path.encode("utf8"), 20)
     if bigFont==None:
         err = sdl2.sdlttf.TTF_GetError()
         raise RuntimeError("Error Loading font: {0}".format(err))
@@ -963,145 +1068,84 @@ def run():
     #
     game =Game( renderer, textureShip)
 
-    #
-    listBonus = []
-
-    #
-    listBalls = []
-    listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
-
-    #
-    playerShip = Ship(WIN_WIDTH/2, WIN_HEIGHT-64, textureShip)
-
-    velocityH = 0
-
-    startTimeH = sdl2.timer.SDL_GetTicks()
-
-    lastMouseXrel = 0
-    lastMouseX = 0
 
     # run event loop
     game.running = True
 
     while game.running:
 
-        events = sdl2.ext.get_events()
-        for event in events:
-            match event.type :
-                case sdl2.SDL_QUIT:
-                    game.running = False
-                case sdl2.SDL_KEYDOWN:
-                    if event.key.keysym.sym == sdl2.SDLK_LEFT and event.key.repeat==False:
-                        velocityH = -1
-                    elif event.key.keysym.sym == sdl2.SDLK_RIGHT and event.key.repeat==False:
-                        velocityH = 1
-                    elif event.key.keysym.sym == sdl2.SDLK_ESCAPE and event.key.repeat==False:
-                        game.running = False
-                    elif event.key.keysym.sym == sdl2.SDLK_p and event.key.repeat==False:
-                        game.fpause ^= True
-                    elif event.key.keysym.sym == sdl2.SDLK_a and event.key.repeat==False:
-                        listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
-                    elif event.key.keysym.sym == sdl2.SDLK_SPACE and event.key.repeat==False:
-                        for b in listBalls:
-                            if b.vel.y==0.0:
-                                if playerShip.hSpeed<-6:
-                                    vx = -2
-                                elif playerShip.hSpeed>6:
-                                    vx = 2
-                                else:
-                                    vx = 0.0
-                                b.launch(float(vx))
-                                break
-                case sdl2.SDL_KEYUP:
-                    if event.key.keysym.sym == sdl2.SDLK_LEFT and event.key.repeat==False:
-                        velocityH = 0
-                    elif event.key.keysym.sym == sdl2.SDLK_RIGHT and event.key.repeat==False:
-                        velocityH = 0
-                case sdl2.SDL_MOUSEBUTTONDOWN:
-                    bstate = sdl2.ext.mouse.mouse_button_state()
-                    if bstate.left==1:
-                        for b in listBalls:
-                            if b.vel.y==0.0:
-                                if playerShip.hSpeed<-6:
-                                    vx = -2
-                                elif playerShip.hSpeed>6:
-                                    vx = 2
-                                else:
-                                    vx = 0.0
-                                b.launch(float(vx))
-                                break
-                case sdl2.SDL_MOUSEMOTION:
-                    motion = event.motion
-                    lastMouseX = motion.x
+        game.processEvent()
 
         #--------------------------------------------------------
         # Update objects states
 
         # Update ship position
-        if velocityH<0:
-            playerShip.moveLeft(10)
-            lastMouseX = playerShip.pos.x
-        elif velocityH>0:
-            playerShip.moveRight(10)
-            lastMouseX = playerShip.pos.x
+        if game.velocityH<0:
+            game.playerShip.moveLeft(10)
+            game.lastMouseX = game.playerShip.pos.x
+        elif game.velocityH>0:
+            game.playerShip.moveRight(10)
+            game.lastMouseX = game.playerShip.pos.x
         else:
-            dx = int(math.fabs(playerShip.pos.x-lastMouseX))
-            if dx>10:
-                if playerShip.pos.x<lastMouseX:
-                    playerShip.moveRight(10)
-                elif playerShip.pos.x>lastMouseX:
-                    playerShip.moveLeft(10)
+            dx = int(math.fabs(game.playerShip.pos.x-game.lastMouseX))
+            if dx>12:
+                if game.playerShip.pos.x<game.lastMouseX:
+                    game.playerShip.moveRight(12)
+                elif game.playerShip.pos.x>game.lastMouseX:
+                    game.playerShip.moveLeft(12)
 
-
-        playerShip.updateState()
+        game.playerShip.updateState()
 
         #
         if not game.fpause:
 
             # Manage balls
-            for b in listBalls:
+            for b in game.listBalls:
                 if b.vel.y==0:
                     # Update standby balls positions from ship
-                    b.next_pos.x = playerShip.pos.x
-                    b.next_pos.y = playerShip.pos.y - b.r
+                    b.next_pos = Vector2f(game.playerShip.pos.x, game.playerShip.pos.y - b.r)
                     b.updatePosition()
                 else:
                     #
-                    if b.pos.y>(playerShip.pos.y+3*playerShip.h):
+                    if b.pos.y>(game.playerShip.pos.y+3*game.playerShip.h):
                         b.fdelete = True # delete ball
                         continue
 
                     # Check Ball Ship collision
-                    ptIntersection = playerShip.hitBall(b)
+                    ptIntersection = game.playerShip.hitBall(b)
                     if ptIntersection!=None:
                         if bouncingSound != None:
                             sdl2.sdlmixer.Mix_PlayChannel(-1, bouncingSound, 0)
-                        vx = b.vel.x
-                        vy = -b.vel.y
-                        dx = 0
-                        if playerShip.hSpeed<-6:
-                            dx = -2
-                        elif playerShip.hSpeed>6:
-                            dx = 2
-                        if dx!=0:
-                            n = math.sqrt(vx*vx+vy*vy)
-                            vx += dx
-                            n1 = math.sqrt(vx*vx+vy*vy)
-                            vx = vx/n1*n
-                            vy = vy/n1*n
-                        x1 = ptIntersection[0]
-                        y1 = ptIntersection[1]
-                        # check if next_pos is in frame
-                        x2 = x1 + vx
-                        y2 = y1 + vy
-                        if not game.frame.contains(x2,y2):
-                            b.setVelocity(Vector2f(-math.fabs(vx), -math.fabs(vy)))
+
+                        if game.playerShip.fmagnet:
+                            b.vel = Vector2f(0.0,0.0)
+                            continue
                         else:
-                            b.setVelocity(Vector2f(vx, vy))
-                        b.pos.x = x1
-                        b.pos.y = y1
-                        b.computeNextPos()
-                        b.updatePosition()
+                            vx = b.vel.x
+                            vy = -b.vel.y
+                            dx = 0
+                            if game.playerShip.hSpeed<-6:
+                                dx = -2
+                            elif game.playerShip.hSpeed>6:
+                                dx = 2
+                            if dx!=0:
+                                n = math.sqrt(vx*vx+vy*vy)
+                                vx += dx
+                                n1 = math.sqrt(vx*vx+vy*vy)
+                                vx = vx/n1*n
+                                vy = vy/n1*n
+                            x1 = ptIntersection[0]
+                            y1 = ptIntersection[1]
+                            # check if next_pos is in frame
+                            x2 = x1 + vx
+                            y2 = y1 + vy
+                            if not game.frame.contains(x2,y2):
+                                b.setVelocity(Vector2f(-vx, -vy))
+                            else:
+                                b.setVelocity(Vector2f(vx, vy))
+                            b.pos = Vector2f(x1,y1)
+                            b.computeNextPos()
+                            b.updatePosition()
 
                     # Check Frame ball collision
                     if not game.doFrameHit(b):
@@ -1112,11 +1156,11 @@ def run():
                             sdl2.sdlmixer.Mix_PlayChannel(-1, bouncingSound, 0)
 
                     # generate bonus
-                    if game.tempScore>800:
+                    if game.tempScore>400:
                         if bonusSound != None:
                             sdl2.sdlmixer.Mix_PlayChannel(-1, bonusSound, 0)
                         game.tempScore = 0
-                        listBonus.append(Bonus(randint(1, 4),game.deleteBrick.left+10,game.deleteBrick.top+5,
+                        game.listBonus.append(Bonus(randint(1, 5),game.deleteBrick.left+10,game.deleteBrick.top+5,
                                                 game.deleteBrick.right-game.deleteBrick.left-20,
                                                 game.deleteBrick.bottom-game.deleteBrick.top-10
                                                 ))
@@ -1126,39 +1170,42 @@ def run():
                         if bouncingSound != None:
                             sdl2.sdlmixer.Mix_PlayChannel(-1, bouncingSound, 0)
                         if game.isLevelCompleted():
-                            listBalls = []
-                            listBonus = []
-                            listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
-                            playerShip.setMediumSize()
+                            game.listBalls = []
+                            game.listBonus = []
+                            game.listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
+                            game.playerShip.setMediumSize()
                             if succesSound != None:
                                 sdl2.sdlmixer.Mix_PlayChannel(-1, succesSound, 0)
 
-            listBalls[:] = [b for b in listBalls if b.fdelete==False]
+            game.listBalls[:] = [b for b in game.listBalls if b.fdelete==False]
 
             # Check for Game Over
-            if len(listBalls)==0:
+            if len(game.listBalls)==0:
                 if game.lifes>0:
                     game.lifes -= 1
-                    listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
-                    playerShip.setMediumSize()
+                    game.listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
+                    game.playerShip.setMediumSize()
                     if faillureSound != None:
                         sdl2.sdlmixer.Mix_PlayChannel(-1, faillureSound, 0)
                 else:
                     # Game Over
                     game.init()
-                    listBalls = []
-                    listBonus = []
-                    listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
-                    playerShip.setMediumSize()
+                    game.listBalls = []
+                    game.listBonus = []
+                    game.listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
+                    game.playerShip.setMediumSize()
                     if gameOverSound != None:
                         sdl2.sdlmixer.Mix_PlayChannel(-1, gameOverSound, 0)
+                    # 
+                    game.processEvent = game.processGameOver
+                    game.mode = GameMode.GAME_OVER
 
-            # Manage Bonus      
-            sLeft = playerShip.left()
-            sTop = playerShip.top()
-            sRight = playerShip.right()
-            sBottom = playerShip.bottom()
-            for b in listBonus:
+            # Manage Bonus hit     
+            sLeft = game.playerShip.left()
+            sTop = game.playerShip.top()
+            sRight = game.playerShip.right()
+            sBottom = game.playerShip.bottom()
+            for b in game.listBonus:
 
                 #
                 if not game.frame.contains(b.pos.x,b.pos.y):
@@ -1176,16 +1223,18 @@ def run():
                         if catchSound != None:
                             sdl2.sdlmixer.Mix_PlayChannel(-1, catchSound, 0)
                         if b.type==1:
-                            playerShip.setBigSize()
+                            game.playerShip.setBigSize()
                         elif b.type==2:
-                            playerShip.setSmallSize()
+                            game.playerShip.setSmallSize()
+                        elif b.type==4:
+                            game.playerShip.setMagnet(True)
                         else:
-                            playerShip.setMediumSize()
+                            game.playerShip.setMediumSize()
                         b.fdelete = True
                 else:
                     b.updateAnim()
 
-            listBonus[:] = [b for b in listBonus if b.fdelete==False]
+            game.listBonus[:] = [b for b in game.listBonus if b.fdelete==False]
 
             
         #---------------------------------------
@@ -1197,19 +1246,51 @@ def run():
         game.draw()
 
         #
-        for b in listBalls:
+        for b in game.listBalls:
             b.draw(renderer)
 
         #
-        playerShip.draw(renderer)
+        game.playerShip.draw(renderer)
 
         #
-        for b in listBonus:
+        for b in game.listBonus:
             b.draw(renderer)
+
+
+        if game.mode == GameMode.STAND_BY:
+            sdl2.sdlttf.TTF_SetFontStyle( bigFont, sdl2.sdlttf.TTF_STYLE_NORMAL)
+            text = "PRESS KEY TO START"
+            ctext_w, ctext_h = c_int(0), c_int(0)
+            sdl2.sdlttf.TTF_SizeText(bigFont, text.encode("utf-8"), ctext_w, ctext_h)
+            text_w = ctext_w.value
+            text_h = ctext_h.value
+            textSurface = sdl2.sdlttf.TTF_RenderText_Solid(bigFont, text.encode("utf-8"), sdl2.SDL_Color(255,255,0,255))
+            standbyTexture = sdl2.SDL_CreateTextureFromSurface(renderer, textSurface)
+            sdl2.SDL_FreeSurface(textSurface)
+            if standbyTexture!=None:
+                src_rect = sdl2.SDL_Rect(x=0, y=0, w=text_w, h=text_h)
+                dest_rect = sdl2.SDL_Rect(x=int((WIN_WIDTH-text_w)/2), y=int(WIN_HEIGHT/2-text_h), w=text_w, h=text_h)
+                sdl2.SDL_RenderCopy(renderer,standbyTexture,src_rect,dest_rect)
+                
+        elif game.mode == GameMode.GAME_OVER:
+            sdl2.sdlttf.TTF_SetFontStyle( bigFont, sdl2.sdlttf.TTF_STYLE_NORMAL)
+            text = "GAME OVER"
+            ctext_w, ctext_h = c_int(0), c_int(0)
+            sdl2.sdlttf.TTF_SizeText(bigFont, text.encode("utf-8"), ctext_w, ctext_h)
+            text_w = ctext_w.value
+            text_h = ctext_h.value
+            textSurface = sdl2.sdlttf.TTF_RenderText_Solid(bigFont, text.encode("utf-8"), sdl2.SDL_Color(255,255,0,255))
+            standbyTexture = sdl2.SDL_CreateTextureFromSurface(renderer, textSurface)
+            sdl2.SDL_FreeSurface(textSurface)
+            if standbyTexture!=None:
+                src_rect = sdl2.SDL_Rect(x=0, y=0, w=text_w, h=text_h)
+                dest_rect = sdl2.SDL_Rect(x=int((WIN_WIDTH-text_w)/2), y=int(WIN_HEIGHT/2-text_h), w=text_w, h=text_h)
+                sdl2.SDL_RenderCopy(renderer,standbyTexture,src_rect,dest_rect)
+
 
         #
         sdl2.SDL_RenderPresent(renderer)
-        sdl2.SDL_Delay(25)
+        sdl2.SDL_Delay(20)
 
 
     # clean up
