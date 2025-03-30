@@ -195,8 +195,7 @@ class Ball:
 
                 p1 = (br.left, br.top)
                 p2 = (br.right, br.top)
-                ptInter = compute_intersection(p1, p2, q1, q2)
-                if ptInter!=None:
+                if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
                     self.setVelocity(Vector2f(self.vel.x,-self.vel.y))
                     self.next_pos.x = ptInter[0]
                     self.next_pos.y = ptInter[1]
@@ -206,8 +205,7 @@ class Ball:
 
                 p1 = (br.left, br.top)
                 p2 = (br.left, br.bottom)
-                ptInter = compute_intersection(p1, p2, q1, q2)
-                if ptInter!=None:
+                if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
                     self.setVelocity(Vector2f(-self.vel.x,self.vel.y))
                     self.next_pos.x = ptInter[0]
                     self.next_pos.y = ptInter[1]
@@ -225,8 +223,7 @@ class Ball:
 
                 p1 = (br.left, br.top)
                 p2 = (br.right, br.top)
-                ptInter = compute_intersection(p1, p2, q1, q2)
-                if ptInter!=None:
+                if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
                     self.setVelocity(Vector2f(self.vel.x,-self.vel.y))
                     self.next_pos.x = ptInter[0]
                     self.next_pos.y = ptInter[1]
@@ -236,8 +233,7 @@ class Ball:
 
                 p1 = (br.right, br.top)
                 p2 = (br.right, br.bottom)
-                ptInter = compute_intersection(p1, p2, q1, q2)
-                if ptInter!=None:
+                if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
                     self.setVelocity(Vector2f(-self.vel.x,self.vel.y))
                     self.next_pos.x = ptInter[0]
                     self.next_pos.y = ptInter[1]
@@ -255,8 +251,7 @@ class Ball:
 
                 p1 = (br.left, br.bottom)
                 p2 = (br.right, br.bottom)
-                ptInter = compute_intersection(p1, p2, q1, q2)
-                if ptInter!=None:
+                if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
                     self.setVelocity(Vector2f(self.vel.x,-self.vel.y))
                     self.next_pos.x = ptInter[0]
                     self.next_pos.y = ptInter[1]
@@ -266,8 +261,7 @@ class Ball:
 
                 p1 = (br.left, br.top)
                 p2 = (br.left, br.bottom)
-                ptInter = compute_intersection(p1, p2, q1, q2)
-                if ptInter!=None:
+                if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
                     self.setVelocity(Vector2f(-self.vel.x,self.vel.y))
                     self.next_pos.x = ptInter[0]
                     self.next_pos.y = ptInter[1]
@@ -285,8 +279,7 @@ class Ball:
 
                 p1 = (br.right, br.top)
                 p2 = (br.right, br.bottom)
-                ptInter = compute_intersection(p1, p2, q1, q2)
-                if ptInter!=None:
+                if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
                     self.setVelocity(Vector2f(-self.vel.x,self.vel.y))
                     self.next_pos.x = ptInter[0]
                     self.next_pos.y = ptInter[1]
@@ -296,8 +289,7 @@ class Ball:
 
                 p1 = (br.left, br.bottom)
                 p2 = (br.right, br.bottom)
-                ptInter = compute_intersection(p1, p2, q1, q2)
-                if ptInter!=None:
+                if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
                     self.setVelocity(Vector2f(self.vel.x,-self.vel.y))
                     self.next_pos.x = ptInter[0]
                     self.next_pos.y = ptInter[1]
@@ -315,8 +307,7 @@ class Ball:
 
                 p1 = (br.left, br.bottom)
                 p2 = (br.right, br.bottom)
-                ptInter = compute_intersection(p1, p2, q1, q2)
-                if ptInter!=None:
+                if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
                     self.setVelocity(Vector2f(self.vel.x,-self.vel.y))
                     self.next_pos.x = ptInter[0]
                     self.next_pos.y = ptInter[1]
@@ -327,8 +318,7 @@ class Ball:
                 # Come from top
                 p1 = (br.left, br.top)
                 p2 = (br.right, br.top)
-                ptInter = compute_intersection(p1, p2, q1, q2)
-                if ptInter!=None:
+                if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
                     self.setVelocity(Vector2f(self.vel.x,-self.vel.y))
                     self.next_pos.x = ptInter[0]
                     self.next_pos.y = ptInter[1]
@@ -340,8 +330,7 @@ class Ball:
                 # Come from left
                 p1 = (br.left, br.top)
                 p2 = (br.left, br.bottom)
-                ptInter = compute_intersection(p1, p2, q1, q2)
-                if ptInter!=None:
+                if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
                     self.setVelocity(Vector2f(-self.vel.x,self.vel.y))
                     self.next_pos.x = ptInter[0]
                     self.next_pos.y = ptInter[1]
@@ -352,8 +341,7 @@ class Ball:
                 # Come from right
                 p1 = (br.right, br.top)
                 p2 = (br.right, br.bottom)
-                ptInter = compute_intersection(p1, p2, q1, q2)
-                if ptInter!=None:
+                if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
                     self.setVelocity(Vector2f(-self.vel.x,self.vel.y))
                     self.next_pos.x = ptInter[0]
                     self.next_pos.y = ptInter[1]
@@ -696,8 +684,7 @@ class Game:
                         q2 = (x2, y2)
                         p1 = (0, 0)
                         p2 = (0, WIN_HEIGHT)
-                        ptInter = compute_intersection(p1, p2, q1, q2)
-                        if ptInter!=None:
+                        if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
                             b.setVelocity(Vector2f(-b.vel.x,b.vel.y))
                             b.next_pos.x = ptInter[0]
                             b.next_pos.y = ptInter[1]
@@ -712,8 +699,7 @@ class Game:
                         q2 = (x2, y2)
                         p1 = (WIN_WIDTH, 0)
                         p2 = (WIN_WIDTH, WIN_HEIGHT)
-                        ptInter = compute_intersection(p1, p2, q1, q2)
-                        if ptInter!=None:
+                        if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
                             b.setVelocity(Vector2f(-b.vel.x,b.vel.y))
                             b.next_pos.x = ptInter[0]
                             b.next_pos.y = ptInter[1]
@@ -728,8 +714,7 @@ class Game:
                         q2 = (x2, y2)
                         p1 = (0, 0)
                         p2 = (WIN_WIDTH, 0)
-                        ptInter = compute_intersection(p1, p2, q1, q2)
-                        if ptInter!=None:
+                        if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
                             b.setVelocity(Vector2f(b.vel.x,-b.vel.y))
                             b.next_pos.x = ptInter[0]
                             b.next_pos.y = ptInter[1]
@@ -744,8 +729,7 @@ class Game:
                         q2 = (x2, y2)
                         p1 = (0, WIN_HEIGHT)
                         p2 = (WIN_WIDTH, WIN_HEIGHT)
-                        ptInter = compute_intersection(p1, p2, q1, q2)
-                        if ptInter!=None:
+                        if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
                             b.setVelocity(Vector2f(b.vel.x,-b.vel.y))
                             b.next_pos.x = ptInter[0]
                             b.next_pos.y = ptInter[1]
@@ -1112,8 +1096,7 @@ def run():
                         continue
 
                     # Check Ball Ship collision
-                    ptIntersection = game.playerShip.hitBall(b)
-                    if ptIntersection!=None:
+                    if (ptInter:=game.playerShip.hitBall(b))!=None:
                         if bouncingSound != None:
                             sdl2.sdlmixer.Mix_PlayChannel(-1, bouncingSound, 0)
 
@@ -1134,8 +1117,8 @@ def run():
                                 n1 = math.sqrt(vx*vx+vy*vy)
                                 vx = vx/n1*n
                                 vy = vy/n1*n
-                            x1 = ptIntersection[0]
-                            y1 = ptIntersection[1]
+                            x1 = ptInter[0]
+                            y1 = ptInter[1]
                             # check if next_pos is in frame
                             x2 = x1 + vx
                             y2 = y1 + vy
