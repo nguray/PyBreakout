@@ -12,7 +12,9 @@ import copy
 
 import sdl2.sdlmixer
 import sdl2.sdlttf
+import ctypes
 from ctypes import c_int, byref
+
 from enum import Enum
 
 
@@ -493,6 +495,10 @@ class Game:
         self.lifes = 3
         self.renderer = renderer
         self.shipTextures = shipTextures
+
+        self.standbyTexture = None
+        self.gameOverTexture = None
+
         self.fpause = False
         filepath = os.path.abspath(os.path.dirname(__file__))
         RESOURCES = sdl2.ext.Resources(filepath, "resources")
@@ -501,6 +507,14 @@ class Game:
         if self.mediumFont==None:
             err = sdl2.sdlttf.TTF_GetError()
             raise RuntimeError("Error initializing the ttf: {0}".format(err))
+        self.bigFont = sdl2.sdlttf.TTF_OpenFont(font_path.encode("utf8"), 20)
+        if self.bigFont==None:
+            err = sdl2.sdlttf.TTF_GetError()
+            raise RuntimeError("Error Loading font: {0}".format(err))
+
+        self.creStandbyTexMsg()
+        self.creGameOverTexMsg()
+
         #
         self.score = 0
         self.score_text_w = 0
@@ -514,6 +528,7 @@ class Game:
         self.lastMouseX = WIN_WIDTH/2
 
         self.processEvent = self.processStandby
+        self.drawGame = self.drawStandbyMode
 
         #
         self.listBonus = []
@@ -533,6 +548,10 @@ class Game:
             sdl2.sdlttf.TTF_CloseFont(self.mediumFont)
         if self.scoreTexture!=None:
             sdl2.SDL_DestroyTexture(self.scoreTexture)
+        if self.standbyTexture!=None:
+            sdl2.SDL_DestroyTexture(self.standbyTexture)
+        if self.gameOverTexture!=None:
+            sdl2.SDL_DestroyTexture(self.gameOverTexture)
 
 
     def init(self):
@@ -761,6 +780,7 @@ class Game:
                     bstate = sdl2.ext.mouse.mouse_button_state()
                     if bstate.left==1:
                         self.processEvent = self.processPlay
+                        self.drawGame = self.drawPlayMode
                         self.mode = GameMode.PLAY
                         return False
         return True
@@ -781,6 +801,7 @@ class Game:
                     bstate = sdl2.ext.mouse.mouse_button_state()
                     if bstate.left==1:
                         self.processEvent = self.processStandby
+                        self.drawGame = self.drawStandbyMode
                         self.mode = GameMode.STAND_BY
                         return False
         return True
@@ -830,6 +851,101 @@ class Game:
                 case sdl2.SDL_MOUSEMOTION:
                     motion = event.motion
                     self.lastMouseX = motion.x
+
+    def creStandbyTexMsg(self):
+
+        sdl2.sdlttf.TTF_SetFontStyle( self.bigFont, sdl2.sdlttf.TTF_STYLE_NORMAL)
+        text = "PRESS KEY TO START"
+        # ctext_w, ctext_h = c_int(0), c_int(0)
+        # sdl2.sdlttf.TTF_SizeText(self.bigFont, text.encode("utf-8"), ctext_w, ctext_h)
+        # text_w = ctext_w.value
+        # text_h = ctext_h.value
+        textSurface = sdl2.sdlttf.TTF_RenderText_Solid(self.bigFont, text.encode("utf-8"), sdl2.SDL_Color(255,255,0,255))
+        self.standbyTexture = sdl2.SDL_CreateTextureFromSurface(self.renderer, textSurface)
+        sdl2.SDL_FreeSurface(textSurface)
+
+    def creGameOverTexMsg(self):
+        sdl2.sdlttf.TTF_SetFontStyle( self.bigFont, sdl2.sdlttf.TTF_STYLE_NORMAL)
+        text = "Game Over"
+        # ctext_w, ctext_h = c_int(0), c_int(0)
+        # sdl2.sdlttf.TTF_SizeText(self.bigFont, text.encode("utf-8"), ctext_w, ctext_h)
+        # text_w = ctext_w.value
+        # text_h = ctext_h.value
+        textSurface = sdl2.sdlttf.TTF_RenderText_Solid(self.bigFont, text.encode("utf-8"), sdl2.SDL_Color(255,255,0,255))
+        self.gameOverTexture = sdl2.SDL_CreateTextureFromSurface(self.renderer, textSurface)
+        sdl2.SDL_FreeSurface(textSurface)
+
+    def drawStandbyMode(self):
+        #
+        self.draw()
+
+        #
+        for b in self.listBalls:
+            b.draw(self.renderer)
+
+        #
+        self.playerShip.draw(self.renderer)
+
+        #
+        for b in self.listBonus:
+            b.draw(self.renderer)
+
+        #
+        if self.standbyTexture!=None:
+            w, h = ctypes.c_int32(0), ctypes.c_int32(0)
+            format = ctypes.c_uint32(0)
+            access = ctypes.c_int32(0)
+            result = sdl2.SDL_QueryTexture(self.standbyTexture, ctypes.byref(format), ctypes.byref(access),
+                                            ctypes.byref(w), ctypes.byref(h))
+            if result == 0:
+                text_w = w.value
+                text_h = h.value
+                src_rect = sdl2.SDL_Rect(x=0, y=0, w=text_w, h=text_h)
+                dest_rect = sdl2.SDL_Rect(x=int((WIN_WIDTH-text_w)/2), y=int(WIN_HEIGHT/2-text_h), w=text_w, h=text_h)
+                sdl2.SDL_RenderCopy(self.renderer,self.standbyTexture,src_rect,dest_rect)
+
+    def drawGameOverMode(self):
+        #
+        self.draw()
+
+        #
+        for b in self.listBalls:
+            b.draw(self.renderer)
+
+        #
+        self.playerShip.draw(self.renderer)
+
+        #
+        for b in self.listBonus:
+            b.draw(self.renderer)
+
+        if self.gameOverTexture!=None:
+            w, h = ctypes.c_int32(0), ctypes.c_int32(0)
+            format = ctypes.c_uint32(0)
+            access = ctypes.c_int32(0)
+            result = sdl2.SDL_QueryTexture(self.gameOverTexture, ctypes.byref(format), ctypes.byref(access),
+                                            ctypes.byref(w), ctypes.byref(h))
+            if result == 0:
+                text_w = w.value
+                text_h = h.value
+                src_rect = sdl2.SDL_Rect(x=0, y=0, w=text_w, h=text_h)
+                dest_rect = sdl2.SDL_Rect(x=int((WIN_WIDTH-text_w)/2), y=int(WIN_HEIGHT/2-text_h), w=text_w, h=text_h)
+                sdl2.SDL_RenderCopy(self.renderer,self.gameOverTexture,src_rect,dest_rect)
+
+    def drawPlayMode(self):
+        #
+        self.draw()
+
+        #
+        for b in self.listBalls:
+            b.draw(self.renderer)
+
+        #
+        self.playerShip.draw(self.renderer)
+
+        #
+        for b in self.listBonus:
+            b.draw(self.renderer)
 
 
 def loadTexture(filePath, renderer):
@@ -1060,7 +1176,7 @@ def run():
 
         game.processEvent()
 
-        #--------------------------------------------------------
+        #------------------------------------------------------------
         # Update objects states
 
         # Update ship position
@@ -1181,6 +1297,7 @@ def run():
                         sdl2.sdlmixer.Mix_PlayChannel(-1, gameOverSound, 0)
                     # 
                     game.processEvent = game.processGameOver
+                    game.drawGame = game.drawGameOverMode
                     game.mode = GameMode.GAME_OVER
 
             # Manage Bonus hit     
@@ -1220,56 +1337,13 @@ def run():
             game.listBonus[:] = [b for b in game.listBonus if b.fdelete==False]
 
             
-        #---------------------------------------
-        # Draw game objects
+        #------------------------------------------------------------------
+        # Draw Game
         sdl2.SDL_SetRenderDrawColor(renderer, 30, 30, 80, sdl2.SDL_ALPHA_OPAQUE)
         sdl2.SDL_RenderClear(renderer)
 
         #
-        game.draw()
-
-        #
-        for b in game.listBalls:
-            b.draw(renderer)
-
-        #
-        game.playerShip.draw(renderer)
-
-        #
-        for b in game.listBonus:
-            b.draw(renderer)
-
-
-        if game.mode == GameMode.STAND_BY:
-            sdl2.sdlttf.TTF_SetFontStyle( bigFont, sdl2.sdlttf.TTF_STYLE_NORMAL)
-            text = "PRESS KEY TO START"
-            ctext_w, ctext_h = c_int(0), c_int(0)
-            sdl2.sdlttf.TTF_SizeText(bigFont, text.encode("utf-8"), ctext_w, ctext_h)
-            text_w = ctext_w.value
-            text_h = ctext_h.value
-            textSurface = sdl2.sdlttf.TTF_RenderText_Solid(bigFont, text.encode("utf-8"), sdl2.SDL_Color(255,255,0,255))
-            standbyTexture = sdl2.SDL_CreateTextureFromSurface(renderer, textSurface)
-            sdl2.SDL_FreeSurface(textSurface)
-            if standbyTexture!=None:
-                src_rect = sdl2.SDL_Rect(x=0, y=0, w=text_w, h=text_h)
-                dest_rect = sdl2.SDL_Rect(x=int((WIN_WIDTH-text_w)/2), y=int(WIN_HEIGHT/2-text_h), w=text_w, h=text_h)
-                sdl2.SDL_RenderCopy(renderer,standbyTexture,src_rect,dest_rect)
-                
-        elif game.mode == GameMode.GAME_OVER:
-            sdl2.sdlttf.TTF_SetFontStyle( bigFont, sdl2.sdlttf.TTF_STYLE_NORMAL)
-            text = "GAME OVER"
-            ctext_w, ctext_h = c_int(0), c_int(0)
-            sdl2.sdlttf.TTF_SizeText(bigFont, text.encode("utf-8"), ctext_w, ctext_h)
-            text_w = ctext_w.value
-            text_h = ctext_h.value
-            textSurface = sdl2.sdlttf.TTF_RenderText_Solid(bigFont, text.encode("utf-8"), sdl2.SDL_Color(255,255,0,255))
-            standbyTexture = sdl2.SDL_CreateTextureFromSurface(renderer, textSurface)
-            sdl2.SDL_FreeSurface(textSurface)
-            if standbyTexture!=None:
-                src_rect = sdl2.SDL_Rect(x=0, y=0, w=text_w, h=text_h)
-                dest_rect = sdl2.SDL_Rect(x=int((WIN_WIDTH-text_w)/2), y=int(WIN_HEIGHT/2-text_h), w=text_w, h=text_h)
-                sdl2.SDL_RenderCopy(renderer,standbyTexture,src_rect,dest_rect)
-
+        game.drawGame()
 
         #
         sdl2.SDL_RenderPresent(renderer)
