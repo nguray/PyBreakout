@@ -27,12 +27,21 @@ from brick import Brick
 from ship import Ship
 from bonus import Bonus
 
+from dataclasses import dataclass
+
 #pip install -U --break-system-packages  git+https://github.com/py-sdl/py-sdl2.git
 
 class GameMode(Enum):
     STAND_BY = 1
     PLAY = 2
-    GAME_OVER = 3
+    HIGH_SCORE = 3
+    GAME_OVER = 4
+
+
+@dataclass
+class HighScore:
+    player: str
+    score: int
 
 
 class Game:
@@ -53,6 +62,10 @@ class Game:
             raise RuntimeError("Error initializing the ttf: {0}".format(err))
         self.bigFont = sdl2.sdlttf.TTF_OpenFont(font_path.encode("utf8"), 20)
         if self.bigFont==None:
+            err = sdl2.sdlttf.TTF_GetError()
+            raise RuntimeError("Error Loading font: {0}".format(err))
+        self.bigBigFont = sdl2.sdlttf.TTF_OpenFont(font_path.encode("utf8"), 24)
+        if self.bigBigFont==None:
             err = sdl2.sdlttf.TTF_GetError()
             raise RuntimeError("Error Loading font: {0}".format(err))
 
@@ -88,11 +101,58 @@ class Game:
 
         self.mode = GameMode.STAND_BY
 
+        #
+        self.iplayer = -1
+        self.player = ''
+        self.listHighScores = [
+            HighScore('',0),
+            HighScore('',0),
+            HighScore('',0),
+            HighScore('',0),
+            HighScore('',0),
+            HighScore('',0),
+            HighScore('',0),
+            HighScore('',0),
+            HighScore('',0),
+            HighScore('',0)
+        ]
+
+        self.tblKeys =	{
+                sdl2.SDLK_a : 'A',
+                sdl2.SDLK_b : 'B',
+                sdl2.SDLK_c : 'C',
+                sdl2.SDLK_d : 'D',
+                sdl2.SDLK_e : 'E',
+                sdl2.SDLK_f : 'F',
+                sdl2.SDLK_g : 'G',
+                sdl2.SDLK_h : 'H',
+                sdl2.SDLK_i : 'I',
+                sdl2.SDLK_j : 'J',
+                sdl2.SDLK_k : 'K',
+                sdl2.SDLK_l : 'L',
+                sdl2.SDLK_m : 'M',
+                sdl2.SDLK_n : 'N',
+                sdl2.SDLK_o : 'O',
+                sdl2.SDLK_p : 'P',
+                sdl2.SDLK_q : 'Q',
+                sdl2.SDLK_r : 'R',
+                sdl2.SDLK_s : 'S',
+                sdl2.SDLK_t : 'T',
+                sdl2.SDLK_u : 'U',
+                sdl2.SDLK_v : 'V',
+                sdl2.SDLK_x : 'X',
+                sdl2.SDLK_y : 'Y',
+                sdl2.SDLK_z : 'Z'
+                }
 
     def __del__(self):
         # body of destructor
         if self.mediumFont!=None:
             sdl2.sdlttf.TTF_CloseFont(self.mediumFont)
+        if self.bigFont!=None:
+            sdl2.sdlttf.TTF_CloseFont(self.bigFont)
+        if self.bigBigFont!=None:
+            sdl2.sdlttf.TTF_CloseFont(self.bigBigFont)
         if self.scoreTexture!=None:
             sdl2.SDL_DestroyTexture(self.scoreTexture)
         if self.standbyTexture!=None:
@@ -110,6 +170,38 @@ class Game:
         self.score = 0
         self.updateScoreTexture()
 
+    def loadHighScores(self,fileName):
+        with open(fileName, 'r') as inF:
+            iLin = 0
+            lin = inF.readline()
+            while lin and iLin<len(self.listHighScores):
+                if lin != "" and lin != "\n":
+                    lin.rstrip()
+                    words = lin.split(';')
+                    self.listHighScores[iLin].player = words[0]
+                    self.listHighScores[iLin].score = int(words[1])
+                iLin += 1
+                lin = inF.readline()
+
+    def saveHighScores(self,fileName):
+        with open(fileName, 'w') as outF:
+            for h in self.listHighScores:
+                strLin = '{};{}\n'.format(h.player,h.score)
+                outF.write(strLin)
+
+    def isNewHighScore(self, newScore: int)->bool:
+        for i,h in enumerate(self.listHighScores):
+            if newScore>=h.score:
+                return i
+        return -1
+
+    def insertHighScore(self,iscore: int,player: str,score: int):
+        i = len(self.listHighScores)-1
+        while i>iscore:
+            self.listHighScores[i] = self.listHighScores[i-1]
+            i -= 1
+        self.listHighScores[iscore] = HighScore(player,score)
+        
 
     def loadLevel(self, iLevel: int =0):
         self.tbl = []
@@ -493,6 +585,79 @@ class Game:
         for b in self.listBonus:
             b.draw(self.renderer)
 
+    def processHighScore(self):
+        #
+        events = sdl2.ext.get_events()
+        for event in events:
+            match event.type :
+                case sdl2.SDL_QUIT:
+                    self.running = False
+                case sdl2.SDL_KEYDOWN:
+                    if event.key.keysym.sym == sdl2.SDLK_ESCAPE and event.key.repeat==False:
+                        self.running = False
+                    elif (event.key.keysym.sym == sdl2.SDLK_RETURN or event.key.keysym.sym == sdl2.SDLK_KP_ENTER) and event.key.repeat==False:
+                        self.processEvent = self.processStandby
+                        self.drawGame = self.drawStandbyMode
+                    elif event.key.keysym.sym == sdl2.SDLK_BACKSPACE and event.key.repeat==False:
+                        curPlayer = self.listHighScores[0].player
+                        if (l:=len(curPlayer))>0:
+                            curPlayer = curPlayer[0:len(curPlayer)-1]
+                            self.listHighScores[0].player = curPlayer
+                    elif event.key.keysym.sym >= sdl2.SDLK_a and event.key.keysym.sym <= sdl2.SDLK_z and event.key.repeat==False:
+                        self.listHighScores[0].player += self.tblKeys[event.key.keysym.sym]
+
+    def drawHighScoreMode(self):
+        #
+        ctext_w, ctext_h = c_int(0), c_int(0)
+        yLin = 50
+        text = "HIGH SCORES"
+        sdl2.sdlttf.TTF_SizeText(self.bigBigFont, text.encode("utf-8"), ctext_w, ctext_h)
+        text_w = ctext_w.value
+        text_h = ctext_h.value
+        textSurface = sdl2.sdlttf.TTF_RenderText_Solid(self.bigBigFont, text.encode("utf-8"), sdl2.SDL_Color(255,255,0,255))
+        texture = sdl2.SDL_CreateTextureFromSurface(self.renderer, textSurface)
+        sdl2.SDL_FreeSurface(textSurface)
+        src_rect = sdl2.SDL_Rect(x=0, y=0, w=text_w, h=text_h)
+        dest_rect = sdl2.SDL_Rect(x=int((WIN_WIDTH-text_w)/2), y=int(yLin), w=text_w, h=text_h)
+        sdl2.SDL_RenderCopy(self.renderer,texture,src_rect,dest_rect)
+        sdl2.SDL_DestroyTexture(texture)
+        #
+        dx = WIN_WIDTH/12
+        xCol1 = 3*dx
+        xCol2 = 7*dx
+        yLin += 80
+        sdl2.sdlttf.TTF_SetFontStyle( self.bigFont, sdl2.sdlttf.TTF_STYLE_NORMAL)
+        sdl2.sdlttf.TTF_SetFontKerning(self.bigFont, 0)
+        for h in self.listHighScores:
+            if h.player=='':
+                text = '--------' 
+            else:
+                text = h.player
+            sdl2.sdlttf.TTF_SizeText(self.bigFont, text.encode("utf-8"), ctext_w, ctext_h)
+            text_w = ctext_w.value
+            text_h = ctext_h.value
+            textSurface = sdl2.sdlttf.TTF_RenderText_Solid(self.bigFont, text.encode("utf-8"), sdl2.SDL_Color(255,255,0,255))
+            texture = sdl2.SDL_CreateTextureFromSurface(self.renderer, textSurface)
+            sdl2.SDL_FreeSurface(textSurface)
+            src_rect = sdl2.SDL_Rect(x=0, y=0, w=text_w, h=text_h)
+            dest_rect = sdl2.SDL_Rect(x=int(xCol1), y=int(yLin), w=text_w, h=text_h)
+            sdl2.SDL_RenderCopy(self.renderer,texture,src_rect,dest_rect)
+            sdl2.SDL_DestroyTexture(texture)
+
+            text = "{:06d}".format(h.score)
+            sdl2.sdlttf.TTF_SizeText(self.bigFont, text.encode("utf-8"), ctext_w, ctext_h)
+            text_w = ctext_w.value
+            text_h = ctext_h.value
+            textSurface = sdl2.sdlttf.TTF_RenderText_Solid(self.bigFont, text.encode("utf-8"), sdl2.SDL_Color(255,255,0,255))
+            texture = sdl2.SDL_CreateTextureFromSurface(self.renderer, textSurface)
+            sdl2.SDL_FreeSurface(textSurface)
+            src_rect = sdl2.SDL_Rect(x=0, y=0, w=text_w, h=text_h)
+            dest_rect = sdl2.SDL_Rect(x=int(xCol2), y=int(yLin), w=text_w, h=text_h)
+            sdl2.SDL_RenderCopy(self.renderer,texture,src_rect,dest_rect)
+            sdl2.SDL_DestroyTexture(texture)
+
+            yLin += (text_h+8)
+
 
 def loadTexture(filePath, renderer):
     # loads bmp image
@@ -658,7 +823,10 @@ def run():
     Bonus.texture = textureBonus
 
     #
-    game =Game( renderer, textureShip)
+    game = Game( renderer, textureShip)
+
+
+    game.loadHighScores('highscores.txt')
 
 
     # run event loop
@@ -780,18 +948,24 @@ def run():
                         sdl2.sdlmixer.Mix_PlayChannel(-1, faillureSound, 0)
                 else:
                     # Game Over
+                    if gameOverSound != None:
+                        sdl2.sdlmixer.Mix_PlayChannel(-1, gameOverSound, 0)
+                    # 
+                    if (ihighScore:=game.isNewHighScore(game.score))>=0:
+                        game.insertHighScore(ihighScore,game.player,game.score)
+                        game.processEvent = game.processHighScore
+                        game.drawGame = game.drawHighScoreMode
+                        game.mode = GameMode.HIGH_SCORE
+                    else:
+                        game.processEvent = game.processGameOver
+                        game.drawGame = game.drawGameOverMode
+                        game.mode = GameMode.GAME_OVER
                     game.init()
                     game.listBalls = []
                     game.listBonus = []
                     game.listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
                     game.playerShip.setMediumSize()
-                    if gameOverSound != None:
-                        sdl2.sdlmixer.Mix_PlayChannel(-1, gameOverSound, 0)
-                    # 
-                    game.processEvent = game.processGameOver
-                    game.drawGame = game.drawGameOverMode
-                    game.mode = GameMode.GAME_OVER
-
+ 
             # Manage Bonus hit     
             sLeft = game.playerShip.left
             sTop = game.playerShip.top
@@ -843,6 +1017,7 @@ def run():
         sdl2.SDL_RenderPresent(renderer)
         sdl2.SDL_Delay(20)
 
+    game.saveHighScores('highscores.txt')
 
     # clean up
     sdl2.SDL_DestroyTexture(textureShip)  # Destroy the texture
@@ -855,6 +1030,7 @@ def run():
         sdl2.sdlttf.TTF_CloseFont(bigFont)
     sdl2.sdlttf.TTF_Quit()
     sdl2.SDL_Quit()
+
 
 
 if __name__ == "__main__":
