@@ -17,12 +17,15 @@ from ctypes import c_int, byref
 
 from enum import Enum
 
+from gameconst import *
 
-WIN_WIDTH   = 594
-WIN_HEIGHT  = 720
-BRICK_WIDTH = WIN_WIDTH / 11 # 56 x 24
-BRICK_HEIGHT= WIN_HEIGHT / 30
-
+from utils import compute_intersection
+from vector2f import Vector2f
+from rectf import Rectf
+from ball import Ball
+from brick import Brick
+from ship import Ship
+from bonus import Bonus
 
 #pip install -U --break-system-packages  git+https://github.com/py-sdl/py-sdl2.git
 
@@ -32,462 +35,6 @@ class GameMode(Enum):
     GAME_OVER = 3
 
 
-@dataclass
-class Vector2f:
-    """Class for 2d vector """
-    x: float
-    y: float
-    def __add__(self, other):
-        return self.__class__(self.x + other.x, self.y + other.y)
-
-    def __radd__(self, other):
-        return self + other
-
-
-@dataclass
-class Rectf:
-    """Class for Rectf """
-    x: float
-    y: float
-    w: float
-    h: float
-    
-    def contains(self,x: float,y: float):
-        right = self.x + self.w 
-        bottom = self.y + self.h
-        return (x>=self.x and x<=right and y>=self.y and y<=bottom)
-    
-    def left(self):
-        return self.x
-    
-    def right(self):
-        return self.x + self.w
-    
-    def top(self):
-        return self.y
-    
-    def bottom(self):
-        return self.y + self.h
-    
-
-class Brick:
-
-    values:int = (0,50,60,70,80,90,100,110,120,50,0)
-    texture = None
-
-    def __init__(self, x:float, y:float, type:int):
-        self.left = x+1
-        self.top  = y+1
-        self.type = type
-        self.right = x + BRICK_WIDTH - 1
-        self.bottom = y + BRICK_HEIGHT - 1
-        if self.type==9:
-            self.resistance = 4
-        elif self.type==10:
-            self.resistance = 8
-        else:
-            self.resistance = 1
-
-    def contain(self, x, y):
-        return  (x>self.left and x<self.right and 
-                    y>self.top and y<self.bottom)
-
-    def draw(self, renderer):
-        #
-        if self.texture!=None:
-            src_rect = sdl2.SDL_Rect(x=0, y=self.type*24, w=56, h=24)
-            dest_rect = sdl2.SDL_Rect(x=int(self.left), y=int(self.top),
-                                       w=int(self.right-self.left), h=int(self.bottom-self.top))
-            sdl2.SDL_RenderCopy(renderer,self.texture,src_rect,dest_rect)
-        else:
-            sdl2.sdlgfx.rectangleRGBA(renderer, int(self.left), int(self.top),
-                                       int(self.right), int(self.bottom), 50, 50, 255, 255)
-
-class Ball:
-    def __init__(self, x:int =0, y:int =0, r:int = 5):
-        self.pos = Vector2f( x, y)
-        self.next_pos = copy.copy(self.pos)
-        self.r = r
-        self.setVelocity(Vector2f( 0, 0))
-        self.fdelete = False
-        self.trail = []
-        self.trail.append(Vector2f(self.pos.x,self.pos.y))
-        self.trail.append(None)
-        self.trail.append(None)
-        self.trail.append(None)
-        self.trail.append(None)
-
-    def setVelocity(self, v: Vector2f):
-        self.vel = copy.copy(v)
-        if self.vel.x!=0 and self.vel.y!=0:
-            self.normal_vel = Vector2f(-self.vel.y, self.vel.x)
-            n = math.sqrt(math.pow(-self.vel.y,2)+math.pow(self.vel.x,2))
-            self.normal_vel.x /= n 
-            self.normal_vel.y /= n
-        else:
-            self.normal_vel = Vector2f(0,0)
-
-    def draw(self, renderer):
-        #
-        i = 0
-        for p in self.trail:
-            if p!=None:
-                r = self.r-i
-                if r <= 0:
-                    r = 1
-                sdl2.sdlgfx.filledCircleRGBA(renderer, int(p.x), int(p.y), r, 255, 255, 200, 255-i*40)
-            i += 1
-        
-        #sdl2.sdlgfx.aalineColor(renderer, int(self.pos.x), int(self.pos.y),
-        #                        int(self.next_pos.x), int(self.next_pos.y), int('0xFF360AF4',16))
-        
-        # x1 = self.pos.x + self.normal_vel.x*self.r
-        # y1 = self.pos.y + self.normal_vel.y*self.r
-        # x2 = x1 + self.vel.x
-        # y2 = y1 + self.vel.y
-        # sdl2.sdlgfx.aalineColor(renderer, int(x1), int(y1), int(x2), int(y2), int('0xFF360AF4',16))
-        # x1 = self.pos.x - self.normal_vel.x*self.r
-        # y1 = self.pos.y - self.normal_vel.y*self.r
-        # x2 = x1 + self.vel.x
-        # y2 = y1 + self.vel.y
-        # sdl2.sdlgfx.aalineColor(renderer, int(x1), int(y1), int(x2), int(y2), int('0xFF360AF4',16))
-
-    def updatePosition(self):
-        self.pos = copy.copy(self.next_pos)
-        self.trail.insert(0,Vector2f(self.pos.x,self.pos.y))
-        self.trail.pop(4)
-
-    def computeNextPos(self):
-        self.next_pos = self.pos + self.vel
-
-    def launch(self, vx):
-
-        if vx==0.0:
-            while True:
-                ia = randint(80, 100)
-                if ia<89 or ia>91:
-                    break
-            a = -(math.pi*ia)/180.0
-            self.setVelocity(Vector2f( 9.5*math.cos(a), 9.5*math.sin(a)))
-        else:
-            self.setVelocity(Vector2f( vx, -9.5))
-
-        self.computeNextPos()
-        self.fstandby = False
-
-    def hitBrick(self, br: Brick, offSetX:float, offSetY:float):
-
-        x1 = self.pos.x + offSetX
-        y1 = self.pos.y + offSetY
-        x2 = self.next_pos.x + offSetX
-        y2 = self.next_pos.y + offSetY
-
-        if br.contain(x2,y2):
-            q1 = (x1, y1)
-            q2 = (x2, y2)
-            
-            if br.contain(x1,y1):
-                self.setVelocity(Vector2f(-self.vel.x,-self.vel.y))
-                self.computeNextPos()
-                self.updatePosition()
-                return True
-
-            elif x1<br.left and y1<br.top:
-                # top left corner
-
-                p1 = (br.left, br.top)
-                p2 = (br.right, br.top)
-                if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
-                    self.setVelocity(Vector2f(self.vel.x,-self.vel.y))
-                    self.next_pos.x = ptInter[0]
-                    self.next_pos.y = ptInter[1]
-                    self.updatePosition()
-                    self.computeNextPos()
-                    return True
-
-                p1 = (br.left, br.top)
-                p2 = (br.left, br.bottom)
-                if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
-                    self.setVelocity(Vector2f(-self.vel.x,self.vel.y))
-                    self.next_pos.x = ptInter[0]
-                    self.next_pos.y = ptInter[1]
-                    self.updatePosition()
-                    self.computeNextPos()
-                    return True
-
-                self.setVelocity(Vector2f(-self.vel.x,-self.vel.y))
-                self.computeNextPos()
-                self.updatePosition()
-                return True
-
-            elif x1>br.right and y1<br.top:
-                # top right corner
-
-                p1 = (br.left, br.top)
-                p2 = (br.right, br.top)
-                if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
-                    self.setVelocity(Vector2f(self.vel.x,-self.vel.y))
-                    self.next_pos.x = ptInter[0]
-                    self.next_pos.y = ptInter[1]
-                    self.updatePosition()
-                    self.computeNextPos()
-                    return True
-
-                p1 = (br.right, br.top)
-                p2 = (br.right, br.bottom)
-                if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
-                    self.setVelocity(Vector2f(-self.vel.x,self.vel.y))
-                    self.next_pos.x = ptInter[0]
-                    self.next_pos.y = ptInter[1]
-                    self.updatePosition()
-                    self.computeNextPos()
-                    return True
-
-                self.setVelocity(Vector2f(-self.vel.x,-self.vel.y))
-                self.computeNextPos()
-                self.updatePosition()
-                return True
-
-            elif x1<br.left and y1>br.bottom:
-                # bottom left corner
-
-                p1 = (br.left, br.bottom)
-                p2 = (br.right, br.bottom)
-                if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
-                    self.setVelocity(Vector2f(self.vel.x,-self.vel.y))
-                    self.next_pos.x = ptInter[0]
-                    self.next_pos.y = ptInter[1]
-                    self.updatePosition()
-                    self.computeNextPos()
-                    return True
-
-                p1 = (br.left, br.top)
-                p2 = (br.left, br.bottom)
-                if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
-                    self.setVelocity(Vector2f(-self.vel.x,self.vel.y))
-                    self.next_pos.x = ptInter[0]
-                    self.next_pos.y = ptInter[1]
-                    self.updatePosition()
-                    self.computeNextPos()
-                    return True
-
-                self.setVelocity(Vector2f(-self.vel.x,-self.vel.y))
-                self.computeNextPos()
-                self.updatePosition()
-                return True
-
-            elif x1>br.right and y1>br.bottom:
-                # bottom right corner
-
-                p1 = (br.right, br.top)
-                p2 = (br.right, br.bottom)
-                if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
-                    self.setVelocity(Vector2f(-self.vel.x,self.vel.y))
-                    self.next_pos.x = ptInter[0]
-                    self.next_pos.y = ptInter[1]
-                    self.updatePosition()
-                    self.computeNextPos()
-                    return True
-
-                p1 = (br.left, br.bottom)
-                p2 = (br.right, br.bottom)
-                if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
-                    self.setVelocity(Vector2f(self.vel.x,-self.vel.y))
-                    self.next_pos.x = ptInter[0]
-                    self.next_pos.y = ptInter[1]
-                    self.updatePosition()
-                    self.computeNextPos()
-                    return True
-                
-                self.setVelocity(Vector2f(-self.vel.x,-self.vel.y))
-                self.computeNextPos()
-                self.updatePosition()
-                return True
-
-            if y1>br.bottom:
-                # Come from bottom
-
-                p1 = (br.left, br.bottom)
-                p2 = (br.right, br.bottom)
-                if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
-                    self.setVelocity(Vector2f(self.vel.x,-self.vel.y))
-                    self.next_pos.x = ptInter[0]
-                    self.next_pos.y = ptInter[1]
-                    self.updatePosition()
-                    self.computeNextPos()
-                    return True
-            elif y1<br.top:
-                # Come from top
-                p1 = (br.left, br.top)
-                p2 = (br.right, br.top)
-                if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
-                    self.setVelocity(Vector2f(self.vel.x,-self.vel.y))
-                    self.next_pos.x = ptInter[0]
-                    self.next_pos.y = ptInter[1]
-                    self.updatePosition()
-                    self.computeNextPos()
-                    return True
-                
-            if x1<br.left:
-                # Come from left
-                p1 = (br.left, br.top)
-                p2 = (br.left, br.bottom)
-                if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
-                    self.setVelocity(Vector2f(-self.vel.x,self.vel.y))
-                    self.next_pos.x = ptInter[0]
-                    self.next_pos.y = ptInter[1]
-                    self.updatePosition()
-                    self.computeNextPos()
-                    return True
-            elif x1>br.right:
-                # Come from right
-                p1 = (br.right, br.top)
-                p2 = (br.right, br.bottom)
-                if (ptInter:=compute_intersection(p1, p2, q1, q2))!=None:
-                    self.setVelocity(Vector2f(-self.vel.x,self.vel.y))
-                    self.next_pos.x = ptInter[0]
-                    self.next_pos.y = ptInter[1]
-                    self.updatePosition()
-                    self.computeNextPos()
-                    return True
-                
-        return False
-
-
-class Bonus:
-
-    texture = None
-
-    def __init__(self, type:int, x:int =0, y:int =0, w:int =40, h:int =12):
-        self.pos = Vector2f( x, y)
-        self.vel = Vector2f( 0, 4.0)
-        self.w = w
-        self.h = h
-        self.type = type
-        self.iAnim = 0
-        self.startTimeAnim = sdl2.timer.SDL_GetTicks()
-        self.fdelete = False
-        self.colors = []
-        self.colors.append(0x00)
-        self.colors.append(int('0xFFEF662E',16))
-        self.colors.append(int('0xFFEA0CFA',16))
-        self.colors.append(int('0xFF0CFA1D',16))
-        self.colors.append(int('0xFFEF662E',16))
-        self.colors.append(int('0xFFEA0CFA',16))
-        self.colors.append(int('0xFF0CFA1D',16))
-
-    def draw(self, renderer):
-        if self.type<=4:
-            if self.texture!=None:
-                src_rect = sdl2.SDL_Rect(x=(self.type-1)*51, y=(self.iAnim % 3)*20, w=50, h=20)
-                dest_rect = sdl2.SDL_Rect(x=int(self.pos.x), y=int(self.pos.y),
-                                        w=int(50), h=int(20))
-                sdl2.SDL_RenderCopy(renderer,self.texture,src_rect,dest_rect)
-        else:
-            sdl2.sdlgfx.roundedBoxColor(renderer, int(self.pos.x), int(self.pos.y), 
-                        int(self.pos.x+self.w), int(self.pos.y+self.h), int(8), self.colors[self.type])
-   
-    def updatePosition(self):
-        self.pos += self.vel
-
-    def updateAnim(self):
-        nbTicks = sdl2.timer.SDL_GetTicks()
-        if (nbTicks-self.startTimeAnim)>250:
-            self.startTimeAnim = nbTicks
-            self.iAnim += 1
-        
-
-class Ship:
-    def __init__(self, x:int =0, y:int =0, texture = None):
-        self.pos = Vector2f( x, y)
-        self.last_pos = copy.copy(self.pos)
-        self.setMediumSize()
-        self.texture = texture
-        self.startTimeS = sdl2.timer.SDL_GetTicks()
-        self.startTimeAnim = sdl2.timer.SDL_GetTicks()
-        self.startXMouse = 0
-        self.hSpeed = 0
-        self.iflash = 0
-        self.fmagnet = False
-
-    def updateState(self):
-        nbTicks = sdl2.timer.SDL_GetTicks()
-        if (nbTicks-self.startTimeS)>20:
-            self.startTimeS = nbTicks
-            self.hSpeed = self.pos.x - self.startXMouse
-            self.startXMouse = self.pos.x
-        if (nbTicks-self.startTimeAnim)>200:
-            self.startTimeAnim = nbTicks
-            self.iflash += 1
-
-    def setSmallSize(self):
-        self.w = 64
-        self.h = 14
-        self.w_2 = self.w/2
-        self.isize = 0
-        self.fmagnet = False
-
-    def setMediumSize(self):
-        self.w = 80
-        self.h = 14
-        self.w_2 = self.w/2
-        self.isize = 1
-        self.fmagnet = False
-
-    def setBigSize(self):
-        self.w = 104
-        self.h = 14
-        self.w_2 = self.w/2
-        self.isize = 2
-        self.fmagnet = False
-
-    def setMagnet(self,f=True):
-        self.setMediumSize()
-        self.fmagnet = f
-
-    def draw(self, renderer):
-        #
-        x1 = self.pos.x - self.w/2
-        x2 = self.pos.x + self.w/2
-        y1 = self.pos.y
-        y2 = y1 + self.h
-        if self.texture!=None:
-            src_rect = sdl2.SDL_Rect(x=0, y=(self.iflash % 2)*self.h + 2*self.isize*self.h, w=self.w, h=self.h)
-            dest_rect = sdl2.SDL_Rect(x=int(x1), y=int(y1), w=self.w, h=self.h)
-            sdl2.SDL_RenderCopy(renderer,self.texture,src_rect,dest_rect)
-        else:
-            sdl2.sdlgfx.rectangleRGBA(renderer, int(x1), int(y1), int(x2), int(y2), 50, 50, 255, 255)
-
-    def moveLeft(self, dx: int):
-        if (self.pos.x-self.w_2)>0 :
-            self.last_pos.x = self.pos.x
-            self.pos.x -= dx
-
-    def moveRight(self, dx: int):
-        if (self.pos.x+self.w_2) < WIN_WIDTH:
-            self.last_pos.x = self.pos.x
-            self.pos.x += dx
-
-    def hitBall(self, b: Ball):
-        p1 = (self.pos.x - self.w_2, self.pos.y)
-        p2 = (self.pos.x + self.w_2, self.pos.y)
-        q1 = (b.pos.x, b.pos.y)
-        q2 = (b.next_pos.x, b.next_pos.y)
-        return compute_intersection(p1, p2, q1, q2)
-    
-    def left(self):
-        return self.pos.x - self.w
-    
-    def right(self):
-        return self.pos.x + self.w
-
-    def top(self):
-        return self.pos.y
-
-    def bottom(self):
-        return self.pos.y + self.h
-
-
 class Game:
     
     def __init__(self, renderer, shipTextures=None, mediumFont=None):
@@ -495,9 +42,6 @@ class Game:
         self.lifes = 3
         self.renderer = renderer
         self.shipTextures = shipTextures
-
-        self.standbyTexture = None
-        self.gameOverTexture = None
 
         self.fpause = False
         filepath = os.path.abspath(os.path.dirname(__file__))
@@ -512,7 +56,10 @@ class Game:
             err = sdl2.sdlttf.TTF_GetError()
             raise RuntimeError("Error Loading font: {0}".format(err))
 
+        self.standbyTexture = None
         self.creStandbyTexMsg()
+
+        self.gameOverTexture = None
         self.creGameOverTexMsg()
 
         #
@@ -600,8 +147,8 @@ class Game:
         sdl2.sdlttf.TTF_SizeText(self.mediumFont, text.encode("utf-8"), text_w, text_h)
         self.score_text_w = text_w.value
         self.score_text_h = text_h.value
-        self.score_text_x = self.frame.right()-self.score_text_w-8
-        self.score_text_y = self.frame.bottom()-self.score_text_h-8
+        self.score_text_x = self.frame.right-self.score_text_w-8
+        self.score_text_y = self.frame.bottom-self.score_text_h-8
         textSurface = sdl2.sdlttf.TTF_RenderText_Solid(self.mediumFont, text.encode("utf-8"), sdl2.SDL_Color(255,255,0,255))
         self.scoreTexture = sdl2.SDL_CreateTextureFromSurface(self.renderer, textSurface)
         sdl2.SDL_FreeSurface(textSurface)
@@ -853,7 +400,6 @@ class Game:
                     self.lastMouseX = motion.x
 
     def creStandbyTexMsg(self):
-
         sdl2.sdlttf.TTF_SetFontStyle( self.bigFont, sdl2.sdlttf.TTF_STYLE_NORMAL)
         text = "PRESS KEY TO START"
         # ctext_w, ctext_h = c_int(0), c_int(0)
@@ -966,60 +512,6 @@ def loadTexture(filePath, renderer):
         print("SDL_LoadBMP failed")
     return texture
 
-
-def orientation(p, q, r):
-    """Returns the orientation of the ordered triplet (p, q, r)."""
-    val = (q[1] - p[1]) * (r[0] - q[0]) - (q[0] - p[0]) * (r[1] - q[1])
-    if val == 0:
-        return 0  # collinear
-    elif val > 0:
-        return 1  # clockwise
-    else:
-        return 2  # counterclockwise
-
-
-def on_segment(p, q, r):
-    """Checks if point q lies on segment pr."""
-    if min(p[0], r[0]) <= q[0] <= max(p[0], r[0]) and min(p[1], r[1]) <= q[1] <= max(p[1], r[1]):
-        return True
-    return False
-
-
-def compute_intersection(p1, p2, q1, q2):
-    """Computes the intersection point of two line segments (if any)."""
-    # Compute the orientation of the ordered triplets
-    o1 = orientation(p1, p2, q1)
-    o2 = orientation(p1, p2, q2)
-    o3 = orientation(q1, q2, p1)
-    o4 = orientation(q1, q2, p2)
-
-    # General case: the segments straddle each other
-    if o1 != o2 and o3 != o4:
-        # Solve for the intersection point
-        denom = (p1[0] - p2[0]) * (q1[1] - q2[1]) - (p1[1] - p2[1]) * (q1[0] - q2[0])
-        num1 = (p1[0] * p2[1] - p1[1] * p2[0])
-        num2 = (q1[0] * q2[1] - q1[1] * q2[0])
-        
-        intersect_x = (num1 * (q1[0] - q2[0]) - (p1[0] - p2[0]) * num2) / denom
-        intersect_y = (num1 * (q1[1] - q2[1]) - (p1[1] - p2[1]) * num2) / denom
-        
-        return (intersect_x, intersect_y)
-    
-    # Special cases for collinear segments where the intersection lies on the segment
-    # p1, p2, q1 are collinear and q1 lies on segment p1p2
-    if o1 == 0 and on_segment(p1, q1, p2):
-        return q1
-    # p1, p2, q2 are collinear and q2 lies on segment p1p2
-    if o2 == 0 and on_segment(p1, q2, p2):
-        return q2
-    # q1, q2, p1 are collinear and p1 lies on segment q1q2
-    if o3 == 0 and on_segment(q1, p1, q2):
-        return p1
-    # q1, q2, p2 are collinear and p2 lies on segment q1q2
-    if o4 == 0 and on_segment(q1, p2, q2):
-        return p2
-    
-    return None  # No intersection
 
 
 def test_not_intersect():
@@ -1301,10 +793,10 @@ def run():
                     game.mode = GameMode.GAME_OVER
 
             # Manage Bonus hit     
-            sLeft = game.playerShip.left()
-            sTop = game.playerShip.top()
-            sRight = game.playerShip.right()
-            sBottom = game.playerShip.bottom()
+            sLeft = game.playerShip.left
+            sTop = game.playerShip.top
+            sRight = game.playerShip.right
+            sBottom = game.playerShip.bottom
             for b in game.listBonus:
 
                 #
@@ -1339,6 +831,8 @@ def run():
             
         #------------------------------------------------------------------
         # Draw Game
+
+        #
         sdl2.SDL_SetRenderDrawColor(renderer, 30, 30, 80, sdl2.SDL_ALPHA_OPAQUE)
         sdl2.SDL_RenderClear(renderer)
 
