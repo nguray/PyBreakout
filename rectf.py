@@ -12,6 +12,12 @@ class Rectf:
     def contains(self,x: float,y: float):
         return (x>=self.x and x<=(self.x + self.w) and y>=self.y and y<=(self.y + self.h))
     
+    def deflate(self,l:float,t:float,r:float,b:float):
+        self.x += l
+        self.y += t
+        self.w -= (r+l)
+        self.h -= (t+b)
+    
     @property
     def left(self):
         return self.x

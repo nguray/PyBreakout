@@ -102,8 +102,10 @@ class Game:
         self.mode = GameMode.STAND_BY
 
         #
-        self.iplayer = -1
         self.player = ''
+        self.ihighScore = -1
+        self.ihighScoreColorText = 0
+        self.highScoreTimer = sdl2.timer.SDL_GetTicks()
         self.listHighScores = [
             HighScore('',0),
             HighScore('',0),
@@ -142,7 +144,17 @@ class Game:
                 sdl2.SDLK_v : 'V',
                 sdl2.SDLK_x : 'X',
                 sdl2.SDLK_y : 'Y',
-                sdl2.SDLK_z : 'Z'
+                sdl2.SDLK_z : 'Z',
+                sdl2.SDLK_0 : '0',
+                sdl2.SDLK_1 : '1',
+                sdl2.SDLK_2 : '2',                
+                sdl2.SDLK_3 : '3',
+                sdl2.SDLK_4 : '4',
+                sdl2.SDLK_5 : '5',
+                sdl2.SDLK_6 : '6',
+                sdl2.SDLK_7 : '7',
+                sdl2.SDLK_8 : '8',
+                sdl2.SDLK_9 : '9'
                 }
 
     def __del__(self):
@@ -202,7 +214,6 @@ class Game:
             i -= 1
         self.listHighScores[iscore] = HighScore(player,score)
         
-
     def loadLevel(self, iLevel: int =0):
         self.tbl = []
         fileName = "Level{il:02d}.txt".format(il=iLevel)
@@ -599,14 +610,21 @@ class Game:
                         self.processEvent = self.processStandby
                         self.drawGame = self.drawStandbyMode
                     elif event.key.keysym.sym == sdl2.SDLK_BACKSPACE and event.key.repeat==False:
-                        curPlayer = self.listHighScores[0].player
+                        curPlayer = self.listHighScores[self.ihighScore].player
                         if (l:=len(curPlayer))>0:
                             curPlayer = curPlayer[0:len(curPlayer)-1]
-                            self.listHighScores[0].player = curPlayer
-                    elif event.key.keysym.sym >= sdl2.SDLK_a and event.key.keysym.sym <= sdl2.SDLK_z and event.key.repeat==False:
-                        self.listHighScores[0].player += self.tblKeys[event.key.keysym.sym]
+                            self.listHighScores[self.ihighScore].player = curPlayer
+                    elif (((event.key.keysym.sym >= sdl2.SDLK_a and event.key.keysym.sym <= sdl2.SDLK_z) or
+                            (event.key.keysym.sym >= sdl2.SDLK_0 and event.key.keysym.sym <= sdl2.SDLK_9))
+                                    and event.key.repeat==False):
+                        self.listHighScores[self.ihighScore].player += self.tblKeys[event.key.keysym.sym]
 
     def drawHighScoreMode(self):
+        #
+        rect = copy.copy(self.frame)
+        rect.deflate(15,15,15,15)
+        sdl2.sdlgfx.boxRGBA(self.renderer, int(rect.left),int(rect.top),
+                                    int(rect.right), int(rect.bottom), 20, 20, 70, 255)
         #
         ctext_w, ctext_h = c_int(0), c_int(0)
         yLin = 50
@@ -614,7 +632,8 @@ class Game:
         sdl2.sdlttf.TTF_SizeText(self.bigBigFont, text.encode("utf-8"), ctext_w, ctext_h)
         text_w = ctext_w.value
         text_h = ctext_h.value
-        textSurface = sdl2.sdlttf.TTF_RenderText_Solid(self.bigBigFont, text.encode("utf-8"), sdl2.SDL_Color(255,255,0,255))
+        textSurface = sdl2.sdlttf.TTF_RenderText_Solid(self.bigBigFont, 
+                                                       text.encode("utf-8"), sdl2.SDL_Color(255,255,0,255))
         texture = sdl2.SDL_CreateTextureFromSurface(self.renderer, textSurface)
         sdl2.SDL_FreeSurface(textSurface)
         src_rect = sdl2.SDL_Rect(x=0, y=0, w=text_w, h=text_h)
@@ -628,7 +647,7 @@ class Game:
         yLin += 80
         sdl2.sdlttf.TTF_SetFontStyle( self.bigFont, sdl2.sdlttf.TTF_STYLE_NORMAL)
         sdl2.sdlttf.TTF_SetFontKerning(self.bigFont, 0)
-        for h in self.listHighScores:
+        for i,h in enumerate(self.listHighScores):
             if h.player=='':
                 text = '--------' 
             else:
@@ -636,7 +655,22 @@ class Game:
             sdl2.sdlttf.TTF_SizeText(self.bigFont, text.encode("utf-8"), ctext_w, ctext_h)
             text_w = ctext_w.value
             text_h = ctext_h.value
-            textSurface = sdl2.sdlttf.TTF_RenderText_Solid(self.bigFont, text.encode("utf-8"), sdl2.SDL_Color(255,255,0,255))
+
+            # For blinking highdcore
+            nbTicks = sdl2.timer.SDL_GetTicks()
+            if (nbTicks-self.highScoreTimer) > 300:
+                self.highScoreTimer = nbTicks
+                self.ihighScoreColorText += 1
+
+            if i==self.ihighScore:
+                if (self.ihighScoreColorText % 2 ==1):
+                    textColor = sdl2.SDL_Color(255,255,0,255)
+                else:
+                    textColor = sdl2.SDL_Color(155,155,0,255)
+            else:
+                textColor = sdl2.SDL_Color(255,255,0,255)
+
+            textSurface = sdl2.sdlttf.TTF_RenderText_Solid(self.bigFont, text.encode("utf-8"), textColor)
             texture = sdl2.SDL_CreateTextureFromSurface(self.renderer, textSurface)
             sdl2.SDL_FreeSurface(textSurface)
             src_rect = sdl2.SDL_Rect(x=0, y=0, w=text_w, h=text_h)
@@ -951,8 +985,9 @@ def run():
                     if gameOverSound != None:
                         sdl2.sdlmixer.Mix_PlayChannel(-1, gameOverSound, 0)
                     # 
-                    if (ihighScore:=game.isNewHighScore(game.score))>=0:
-                        game.insertHighScore(ihighScore,game.player,game.score)
+                    game.ihighScore = game.isNewHighScore(game.score)
+                    if game.ihighScore>=0:
+                        game.insertHighScore(game.ihighScore,game.player,game.score)
                         game.processEvent = game.processHighScore
                         game.drawGame = game.drawHighScoreMode
                         game.mode = GameMode.HIGH_SCORE
