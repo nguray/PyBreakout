@@ -2,16 +2,17 @@ import os
 from os import path
 from random import randint
 import sys
+
+import sdl2
 import sdl2.ext
-import sdl2.sdlgfx
-from sdl2 import (pixels, render, events as sdlevents, surface, error,timer)
+import sdl2.sdlmixer
+import sdl2.sdlttf
+
 from dataclasses import dataclass
 import math 
 from random import randint
 import copy
 
-import sdl2.sdlmixer
-import sdl2.sdlttf
 import ctypes
 from ctypes import c_int, byref
 
@@ -287,7 +288,7 @@ class Game:
         self.nextLevel()
         return True
 
-    def doBricksHit(self, b: Ball):
+    def doBrickHit(self, b: Ball):
         for i,br in enumerate(self.tbl):
             if br!=None:
 
@@ -821,7 +822,7 @@ def run():
         exit()
 
     # Create a texture from the surface
-    textureShip = sdl2.SDL_CreateTextureFromSurface(renderer, surface)
+    textureShip:sdl2.surface = sdl2.SDL_CreateTextureFromSurface(renderer, surface)
     sdl2.SDL_FreeSurface(surface)  # Free the surface as it's no longer needed
     if not textureShip:
         print(f"Failed to create texture: {sdl2.SDL_GetError()}")
@@ -959,7 +960,7 @@ def run():
                                                 ))
 
                     #
-                    if game.doBricksHit(b):
+                    if game.doBrickHit(b):
                         if bouncingSound != None:
                             sdl2.sdlmixer.Mix_PlayChannel(-1, bouncingSound, 0)
                         if game.isLevelCompleted():

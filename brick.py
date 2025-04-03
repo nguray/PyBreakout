@@ -1,17 +1,15 @@
 import sdl2.sdlgfx
 from gameconst import *
+from rectf import Rectf
 
-class Brick:
+class Brick(Rectf):
 
     values:int = (0,50,60,70,80,90,100,110,120,50,0)
     texture = None
 
     def __init__(self, x:float, y:float, type:int):
-        self.left = x+1
-        self.top  = y+1
+        super().__init__(x+1,y+1,BRICK_WIDTH - 1,BRICK_HEIGHT - 1)
         self.type = type
-        self.right = x + BRICK_WIDTH - 1
-        self.bottom = y + BRICK_HEIGHT - 1
         if self.type==9:
             self.resistance = 4
         elif self.type==10:
@@ -20,8 +18,7 @@ class Brick:
             self.resistance = 1
 
     def contain(self, x, y):
-        return  (x>self.left and x<self.right and 
-                    y>self.top and y<self.bottom)
+        return  (x>=self.left and x<=self.right and y>=self.top and y<=self.bottom)
 
     def draw(self, renderer):
         #

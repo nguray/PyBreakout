@@ -68,7 +68,7 @@ class Ball:
 
         if vx==0.0:
             while True:
-                ia = randint(80, 100)
+                ia = randint(85, 95)
                 if ia<89 or ia>91:
                     break
             a = -(math.pi*ia)/180.0

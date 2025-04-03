@@ -1,7 +1,6 @@
 from vector2f import Vector2f
-import sdl2.ext
-import sdl2.sdlgfx
-from sdl2 import (pixels, render, events as sdlevents, surface, error,timer)
+
+import sdl2
 import copy
 
 from gameconst import *

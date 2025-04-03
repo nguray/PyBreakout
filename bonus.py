@@ -1,5 +1,4 @@
-import sdl2.ext
-import sdl2.sdlgfx
+import sdl2
 
 from vector2f import Vector2f
 
