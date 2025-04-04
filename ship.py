@@ -1,3 +1,4 @@
+import os
 from vector2f import Vector2f
 
 import sdl2
@@ -8,11 +9,11 @@ from utils import compute_intersection
 from ball import Ball
 
 class Ship:
-    def __init__(self, x:int =0, y:int =0, texture = None):
+    texture = None
+    def __init__(self, x:int =0, y:int =0):
         self.pos = Vector2f( x, y)
         self.last_pos = copy.copy(self.pos)
         self.setMediumSize()
-        self.texture = texture
         self.startTimeS = sdl2.timer.SDL_GetTicks()
         self.startTimeAnim = sdl2.timer.SDL_GetTicks()
         self.startXMouse = 0
@@ -100,3 +101,23 @@ class Ship:
     def bottom(self):
         return self.pos.y + self.h
 
+    @classmethod
+    def loadTexture(cls,renderer):
+        filepath = os.path.abspath(os.path.dirname(__file__))
+        RESOURCES = sdl2.ext.Resources(filepath, "resources")
+        image_path = RESOURCES.get_path("SpaceShip.png")
+        surface = sdl2.ext.image.load_image(image_path.encode('utf-8'))
+        if not surface:
+            print(f"Failed to create texture: {sdl2.SDL_GetError()}")
+            exit()
+
+        # Create a texture from the surface
+        cls.texture = sdl2.SDL_CreateTextureFromSurface(renderer, surface)
+        sdl2.SDL_FreeSurface(surface)  # Free the surface as it's no longer needed
+        if not cls.texture:
+            print(f"Failed to create texture: {sdl2.SDL_GetError()}")
+            exit()
+
+    @classmethod
+    def freeTexture(cls):
+        sdl2.SDL_DestroyTexture(cls.texture)  # Destroy the texture

@@ -47,11 +47,10 @@ class HighScore:
 
 class Game:
     
-    def __init__(self, renderer, shipTextures=None, mediumFont=None):
+    def __init__(self, renderer):
         self.frame = Rectf(0,0,WIN_WIDTH,WIN_HEIGHT)
         self.lifes = 3
         self.renderer = renderer
-        self.shipTextures = shipTextures
 
         self.fpause = False
         filepath = os.path.abspath(os.path.dirname(__file__))
@@ -98,7 +97,7 @@ class Game:
         self.listBalls = []
         self.listBalls.append(Ball(WIN_WIDTH/2, WIN_HEIGHT-44, 4))
         
-        self.playerShip = Ship(WIN_WIDTH/2, WIN_HEIGHT-64, shipTextures)
+        self.playerShip = Ship(WIN_WIDTH/2, WIN_HEIGHT-64)
 
         self.mode = GameMode.STAND_BY
 
@@ -267,13 +266,13 @@ class Game:
                     #sdl2.sdlgfx.roundedBoxColor(renderer, int(b.left+1), int(b.top+1), 
                     #            int(b.right-1), int(b.bottom-1), int(2), self.colors[b.type])
         # Remain lifes
-        if self.shipTextures!=None:
+        if Ship.texture!=None:
             y = WIN_HEIGHT - 20
             for i in range(0,self.lifes):
                 src_rect = sdl2.SDL_Rect(x=0, y=0, w=64, h=14)
                 x = i * 40 + 10
                 dest_rect = sdl2.SDL_Rect(x=int(x), y=int(y), w=32, h=8)
-                sdl2.SDL_RenderCopy(self.renderer,self.shipTextures,src_rect,dest_rect)
+                sdl2.SDL_RenderCopy(self.renderer,Ship.texture,src_rect,dest_rect)
 
         if self.scoreTexture!=None:
             src_rect = sdl2.SDL_Rect(x=0, y=0, w=self.score_text_w, h=self.score_text_h)
@@ -800,12 +799,6 @@ def run():
 
     sdl2.sdlttf.TTF_Init()
 
-    font_path = RESOURCES.get_path("sansation.ttf")
-    bigFont = sdl2.sdlttf.TTF_OpenFont(font_path.encode("utf8"), 20)
-    if bigFont==None:
-        err = sdl2.sdlttf.TTF_GetError()
-        raise RuntimeError("Error Loading font: {0}".format(err))
-
     # create window
     win = sdl2.SDL_CreateWindow(b"Breakout PySDL",
             sdl2.SDL_WINDOWPOS_CENTERED,
@@ -815,50 +808,18 @@ def run():
     # create renderer
     renderer = sdl2.SDL_CreateRenderer(win, -1, sdl2.SDL_RENDERER_ACCELERATED | sdl2.SDL_RENDERER_PRESENTVSYNC)
 
-    image_path = RESOURCES.get_path("SpaceShip.png")
-    surface = sdl2.ext.image.load_image(image_path.encode('utf-8'))
-    if not surface:
-        print(f"Failed to create texture: {sdl2.SDL_GetError()}")
-        exit()
-
-    # Create a texture from the surface
-    textureShip:sdl2.surface = sdl2.SDL_CreateTextureFromSurface(renderer, surface)
-    sdl2.SDL_FreeSurface(surface)  # Free the surface as it's no longer needed
-    if not textureShip:
-        print(f"Failed to create texture: {sdl2.SDL_GetError()}")
-        exit()
-
-
-    image_path = RESOURCES.get_path("Bricks.png")
-    surface = sdl2.ext.image.load_image(image_path.encode('utf-8'))
-    if not surface:
-        print(f"Failed to create texture: {sdl2.SDL_GetError()}")
-        exit()
-
-    # Create a texture from the surface
-    textureBrick = sdl2.SDL_CreateTextureFromSurface(renderer, surface)
-    sdl2.SDL_FreeSurface(surface)  # Free the surface as it's no longer needed
-    if not textureBrick:
-        print(f"Failed to create texture: {sdl2.SDL_GetError()}")
-        exit()
-    Brick.texture = textureBrick
-
-    image_path = RESOURCES.get_path("Bonus.png")
-    surface = sdl2.ext.image.load_image(image_path.encode('utf-8'))
-    if not surface:
-        print(f"Failed to create texture: {sdl2.SDL_GetError()}")
-        exit()
-
-    # Create a texture from the surface
-    textureBonus = sdl2.SDL_CreateTextureFromSurface(renderer, surface)
-    sdl2.SDL_FreeSurface(surface)  # Free the surface as it's no longer needed
-    if not textureBonus:
-        print(f"Failed to create texture: {sdl2.SDL_GetError()}")
-        exit()
-    Bonus.texture = textureBonus
 
     #
-    game = Game( renderer, textureShip)
+    Brick.loadTexture(renderer)
+
+    #
+    Bonus.loadTexture(renderer)
+
+    #
+    Ship.loadTexture(renderer)
+
+    #
+    game = Game(renderer)
 
 
     game.loadHighScores('highscores.txt')
@@ -1056,14 +1017,15 @@ def run():
     game.saveHighScores('highscores.txt')
 
     # clean up
-    sdl2.SDL_DestroyTexture(textureShip)  # Destroy the texture
-    sdl2.SDL_DestroyTexture(textureBrick)  # Destroy the texture
-    sdl2.SDL_DestroyTexture(textureBonus)  # Destroy the texture
+
+    Brick.freeTexture()
+    Bonus.freeTexture()
+    Ship.freeTexture()
+
     sdl2.SDL_DestroyRenderer(renderer)
     sdl2.SDL_DestroyWindow(win)
     sdl2.sdlmixer.Mix_CloseAudio()
-    if bigFont!=None:
-        sdl2.sdlttf.TTF_CloseFont(bigFont)
+
     sdl2.sdlttf.TTF_Quit()
     sdl2.SDL_Quit()
 

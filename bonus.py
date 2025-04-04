@@ -1,3 +1,4 @@
+import os
 import sdl2
 
 from vector2f import Vector2f
@@ -44,3 +45,22 @@ class Bonus:
             self.startTimeAnim = nbTicks
             self.iAnim += 1
         
+    @classmethod
+    def loadTexture(cls,renderer):
+        filepath = os.path.abspath(os.path.dirname(__file__))
+        RESOURCES = sdl2.ext.Resources(filepath, "resources")
+        image_path = RESOURCES.get_path("Bonus.png")
+        surface = sdl2.ext.image.load_image(image_path.encode('utf-8'))
+        if not surface:
+            print(f"Failed to create texture: {sdl2.SDL_GetError()}")
+            exit()
+        # Create a texture from the surface
+        cls.texture = sdl2.SDL_CreateTextureFromSurface(renderer, surface)
+        sdl2.SDL_FreeSurface(surface)  # Free the surface as it's no longer needed
+        if not cls.texture:
+            print(f"Failed to create texture: {sdl2.SDL_GetError()}")
+            exit()
+
+    @classmethod
+    def freeTexture(cls):
+        sdl2.SDL_DestroyTexture(cls.texture)  # Destroy the texture
